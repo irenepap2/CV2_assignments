@@ -179,9 +179,9 @@ def plot_progress(source, target, trans, iter, dir='./figures/waves', save_figur
 
 if __name__ == "__main__":
     # open3d_example()
-    source, target = open_wave_data()
-    # source, target = open_bunny_data()
+    # source, target = open_wave_data()
+    source, target = open_bunny_data()
     # plot_progress(source, target, source, './figures/waves')
-    R, t = icp(source, target, kd_tree=True, epsilon=0.0001)
+    R, t = icp(source, target, kd_tree=True, epsilon=0.00001, max_iterations=50)
     trans = (R @ source) + t
-    plot_progress(source, target, trans, iter=0 ,save_figure=False)
+    plot_progress(source, target, trans, iter=0, save_figure=False)
