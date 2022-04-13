@@ -4,6 +4,7 @@ import os
 from scipy.spatial.distance import cdist
 import matplotlib.pyplot as plt
 from mpl_toolkits import mplot3d
+from scipy.spatial import cKDTree
 
 # globals.
 DATA_DIR = 'Data'  # This depends on where this file is located. Change for your needs.
@@ -45,24 +46,42 @@ def open_bunny_data():
 def calculate_closest_points(A1, A2):
     '''  
     Computes euclidean distance from every source pointcloud A1 
-    to every target pointcloud A2 and returns the corresponding A2 indices 
+    to every target pointcloud A2 and returns the corresponding A2 matches 
     with the minimum distance from the A1 cloudpoints
     '''
 
     euclidean_distances = cdist(A1.T, A2.T)
     shortest_indx = np.argmin(euclidean_distances, axis=1)
-    return shortest_indx
+    matches = A2[:, shortest_indx]
+
+    return matches
+
+
+def calculate_closest_points_kd_tree(A1, A2):
+    '''  
+    Computes closest points for every source pointcloud A1 using the kd-tree
+    '''
+
+    tree = cKDTree(A2.T)
+    _, shortest_indx = tree.query(A1.T) 
+    matches = A2[:, shortest_indx]
+
+    return matches
 
 
 def calculate_RMS(source, target):
-    rms = np.mean(np.sqrt(sum(((source - target)**2))))
+    rms = np.sqrt(np.mean(((source - target)**2)))
     return rms
 
 
 def get_new_R_t(source, target):
+
+    x_centroid = np.mean(source, axis=1)
+    y_centroid = np.mean(target, axis=1)
+
     #compute the centered vectors
-    x = source.T - np.mean(source, axis=1)
-    y = target.T - np.mean(target, axis=1)
+    x = source.T - x_centroid
+    y = target.T - y_centroid
     
     #compute the covariance matix
     A = x.T @ y
@@ -70,13 +89,12 @@ def get_new_R_t(source, target):
     #compute the SVD and get R,t
     U, S, Vt = np.linalg.svd(A)
 
-    n = Vt.shape[1]
-    I = np.eye(n)
-    I[n-1][n-1] = 1/np.linalg.det(Vt.T @ U.T)
+    I = np.eye(Vt.shape[1])
+    I[-1, -1] = 1/np.linalg.det(Vt.T @ U.T)
 
     R = Vt.T @ I @ U.T
     
-    t = np.mean(target, axis=1) - R @ np.mean(source, axis=1)
+    t = y_centroid - R @ x_centroid
     t = np.expand_dims(t, axis=1)
 
     return R, t
@@ -85,13 +103,14 @@ def get_new_R_t(source, target):
 #     ICP                  #
 ############################
 
-def icp(A1, A2, max_iterations=20, epsilon=0.0000001):
+def icp(A1, A2, max_iterations=20, epsilon=0.01, kd_tree=False):
 
     ###### 0. (adding noise)
 
     ###### 1. initialize R= I , t= 0
     R = rotation = np.identity(3)
     t = translation = np.zeros((3,1))
+    source = A1
 
     past_rms = np.inf
 
@@ -101,19 +120,21 @@ def icp(A1, A2, max_iterations=20, epsilon=0.0000001):
         # 2. using different sampling methods
         
         # 3. transform point cloud with R and t
-        A1 = (R @ A1) + t
-        plot_progress(source, target, A1, iter)
+        A1 = R @ A1 + t
+        # plot_progress(source, A2, A1, iter)
 
         # 4. Find the closest point for each point in A1 based on A2 using brute-force approach
-        matching_indx = calculate_closest_points(A1, A2)
-        matches = A2[:, matching_indx]
+        if kd_tree:
+            matches = calculate_closest_points_kd_tree(A1, A2)
+        else:
+            matches = calculate_closest_points(A1, A2)
 
         # 5. Calculate RMS
         rms = calculate_RMS(A1, matches)
 
         # check if RMS is unchanged or within threshold
-        print(np.abs(rms-past_rms))
-        if(np.abs(rms-past_rms) < epsilon):
+        print('Iter', iter, 'RMS', np.abs(rms-past_rms))
+        if abs(past_rms-rms) < epsilon:
             break
         
         past_rms = rms
@@ -128,15 +149,17 @@ def icp(A1, A2, max_iterations=20, epsilon=0.0000001):
     return rotation, translation
 
 
-def plot_progress(source, target, trans, iter):
+def plot_progress(source, target, trans, iter, dir='./figures/waves', save_figure=True):
     plt.figure()
     ax = plt.axes(projection='3d')
     ax.scatter3D(trans[0], trans[1], trans[2], label='Transformation')
     ax.scatter3D(target[0], target[1], target[2], label='Target')
     ax.scatter3D(source[0], source[1], source[2], label='Source')
     ax.legend()
-    plt.savefig(f'./figures/prog_{iter}.png')
-    # plt.show()
+    if save_figure:
+        plt.savefig(dir + f'/prog_{iter}.png')
+    else:
+        plt.show()
 
 
 ############################
@@ -156,9 +179,9 @@ def plot_progress(source, target, trans, iter):
 
 if __name__ == "__main__":
     # open3d_example()
-    # source, target = open_wave_data()
-    source, target = open_bunny_data()
-    # plot_progress(source, target, source, 0)
-    R, t = icp(source, target)
+    source, target = open_wave_data()
+    # source, target = open_bunny_data()
+    # plot_progress(source, target, source, './figures/waves')
+    R, t = icp(source, target, kd_tree=True, epsilon=0.0001)
     trans = (R @ source) + t
-    # plot_progress(source, target, trans)
+    plot_progress(source, target, trans, iter=0 ,save_figure=False)
