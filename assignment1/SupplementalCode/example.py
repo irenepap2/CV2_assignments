@@ -16,14 +16,15 @@ DATA_DIR = 'Data'  # This depends on where this file is located. Change for your
 
 
 # == Load data ==
-def open3d_example():
-    pcd = o3d.io.read_point_cloud("Data/data/0000000000.pcd")
-    # ## convert into ndarray
-
+def open3d_example(path="Data/data/0000000000.pcd"):
+    pcd = o3d.io.read_point_cloud(path)
+    
+    # convert into ndarray
     pcd_arr = np.asarray(pcd.points)
 
-    # ***  you need to clean the point cloud using a threshold ***
-    pcd_arr_cleaned = pcd_arr
+    # clean the point cloud using a threshold
+    dist = np.sqrt(np.sum(pcd_arr ** 2, axis = 1))
+    pcd_arr_cleaned = pcd_arr[dist < 2]
 
     # visualization from ndarray
     vis_pcd = o3d.geometry.PointCloud()
@@ -150,16 +151,29 @@ def icp(A1, A2, max_iterations=20, epsilon=0.01, kd_tree=False):
 
 
 def plot_progress(source, target, trans, iter, dir='./figures/waves', save_figure=True):
-    plt.figure()
-    ax = plt.axes(projection='3d')
-    ax.scatter3D(trans[0], trans[1], trans[2], label='Transformation')
-    ax.scatter3D(target[0], target[1], target[2], label='Target')
-    ax.scatter3D(source[0], source[1], source[2], label='Source')
-    ax.legend()
+    
+    # visualization from ndarray
+    source_pcd = o3d.geometry.PointCloud()
+    source_pcd.points = o3d.utility.Vector3dVector(source.T)
+    target_pcd = o3d.geometry.PointCloud()
+    target_pcd.points = o3d.utility.Vector3dVector(target.T)
+    trans_pcd = o3d.geometry.PointCloud()
+    trans_pcd.points = o3d.utility.Vector3dVector(trans.T)
+    source_pcd.paint_uniform_color([1, 0, 0])
+    target_pcd.paint_uniform_color([0, 1, 0])
+    trans_pcd.paint_uniform_color([0, 0, 1])
+    o3d.visualization.draw_geometries([source_pcd, target_pcd, trans_pcd])
+
+    vis = o3d.visualization.Visualizer()
+    vis.create_window()
+    vis.add_geometry(source_pcd)
+    vis.add_geometry(target_pcd)
+    vis.add_geometry(trans_pcd)
+    vis.poll_events()
+    vis.update_renderer()
+
     if save_figure:
-        plt.savefig(dir + f'/prog_{iter}.png')
-    else:
-        plt.show()
+        vis.capture_screen_image(dir + f'/prog_{iter}.png')
 
 
 ############################
@@ -181,7 +195,6 @@ if __name__ == "__main__":
     # open3d_example()
     # source, target = open_wave_data()
     source, target = open_bunny_data()
-    # plot_progress(source, target, source, './figures/waves')
-    R, t = icp(source, target, kd_tree=True, epsilon=0.00001, max_iterations=50)
+    R, t = icp(source, target, kd_tree=True, epsilon=1e-8, max_iterations=50)
     trans = (R @ source) + t
-    plot_progress(source, target, trans, iter=0, save_figure=False)
+    plot_progress(source, target, trans, iter='last', dir='./figures/bunny', save_figure=True)
