@@ -258,6 +258,8 @@ if __name__ == "__main__":
     # open3d_example()
     # source, target = open_wave_data()
     source, target = open_bunny_data()
+    
+    samplings = ['uniform', 'random', 'multi_res', 'info_reg', 'none']
     time1 = time.time()
     R, t = icp(source, target, sampling=samplings[1], epsilon=1e-8, max_iters=50, total_p=source.shape[1] // 100, kd_tree=True)
     print("Time:", time.time() - time1)
