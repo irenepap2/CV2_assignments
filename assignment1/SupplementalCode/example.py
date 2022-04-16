@@ -2,6 +2,9 @@ import numpy as np
 import open3d as o3d
 import os
 from scipy.spatial.distance import cdist
+from random import randint, sample
+import time
+import math
 import matplotlib.pyplot as plt
 from mpl_toolkits import mplot3d
 from scipy.spatial import cKDTree
@@ -63,6 +66,21 @@ def calculate_closest_points_kd_tree(A1, A2):
     return matches
 
 
+def subsample_graph(A1, points=10000):
+    '''
+    Create reduced point cloud for subsampling
+    '''
+    gen_points = sample(range(0, len(A1[0] - 1)), points)
+    new_A1 = np.array([[], [], []])
+
+    # Create downsampled A1 from generated points
+    for point in gen_points:
+        new_point = np.array([[A1[0][point]], [A1[1][point]], [A1[2][point]]])
+        new_A1 = np.hstack((new_A1, new_point))
+
+    return np.array(new_A1)
+
+
 def calculate_RMS(source, target):
     rms = np.sqrt(np.mean(((source - target)**2)))
     return rms
@@ -98,18 +116,40 @@ def get_new_R_t(source, target):
 #     ICP                  #
 ############################
 
-def icp(A1, A2, max_iterations=20, epsilon=0.01, kd_tree=False):
+def icp(A1, A2, sampling, max_iters=20, epsilon=0.01, total_p=1000, kd_tree=False, N=4):
+    '''
+    Perform ICP algorithm to perform Rototranslation.
+    
+    input:
+        - A1:          The source image.
+        - A2:          The target image.
+        - sampling:    The sampling type of ['uniform', 'random', 'multi_res',
+                                            'info_reg', 'none'].
+        - max_iters:   Max iterations the ICP can run.
+        - epsilon:     Error threshold.
+        - dist:        Total points to use for sampling.
+        - kd_tree:     Determine whether kd_tree algorithm used for
+                       point matching.
+        - N:           Something with multiRes TODO.
+    
+    output:
+        - rotation:    Final rotation.
+        - translation: Final translation.
+    '''
 
     ###### 0. (adding noise)
 
     ###### 1. initialize R= I , t= 0
     R = rotation = np.identity(3)
     t = translation = np.zeros((3,1))
-    source = A1
 
     past_rms = 1
+    
+    if sampling == 'uniform':
+        new_A1 = subsample_graph(A1, points=total_p)
+        new_A2 = subsample_graph(A2, points=total_p)
 
-    for iter in range(max_iterations):
+    for iter in range(max_iters):
         # go to 2. unless RMS is unchanged(<= epsilon)
 
         # 2. using different sampling methods
@@ -117,14 +157,35 @@ def icp(A1, A2, max_iterations=20, epsilon=0.01, kd_tree=False):
         # 3. transform point cloud with R and t
         A1 = R @ A1 + t
 
-        # 4. Find the closest point for each point in A1 based on A2 using brute-force approach
-        if kd_tree:
-            matches = calculate_closest_points_kd_tree(A1, A2)
+        # 4. Find the closest point for each point in A1 based on A2 using different approaches
+
+        # Uniform sampling
+        if sampling == 'uniform':
+            new_A1 = R @ new_A1 + t
+            if kd_tree:
+                matches = calculate_closest_points_kd_tree(new_A1, new_A2)
+            else:
+                matches = calculate_closest_points(new_A1, new_A2)
+        # Random sampling
+        elif sampling == 'random':
+            new_A1 = subsample_graph(A1, points=total_p)
+            new_A2 = subsample_graph(A2, points=total_p)
+            if kd_tree:
+                matches = calculate_closest_points_kd_tree(new_A1, new_A2)
+            else:
+                matches = calculate_closest_points(new_A1, new_A2)
+        # Brute force
         else:
-            matches = calculate_closest_points(A1, A2)
+            if kd_tree:
+                matches = calculate_closest_points_kd_tree(A1, A2)
+            else:
+                matches = calculate_closest_points(A1, A2)
 
         # 5. Calculate RMS
-        rms = calculate_RMS(A1, matches)
+        if sampling and sampling != 'none':
+            rms = calculate_RMS(new_A1, matches)
+        else:
+            rms = calculate_RMS(A1, matches)
 
         # check if RMS is unchanged or within threshold
         print('Iter', iter, 'RMS', np.abs(rms-past_rms))
@@ -134,7 +195,10 @@ def icp(A1, A2, max_iterations=20, epsilon=0.01, kd_tree=False):
         past_rms = rms
 
         # 6. Refine R and t using SVD
-        R, t = get_new_R_t(A1, matches)
+        if sampling and sampling != 'none':
+            R, t = get_new_R_t(new_A1, matches)
+        else:
+            R, t = get_new_R_t(A1, matches)
 
         # Update rotation and translation
         rotation = R @ rotation
@@ -143,7 +207,7 @@ def icp(A1, A2, max_iterations=20, epsilon=0.01, kd_tree=False):
     return rotation, translation
 
 
-def plot_progress(source, target, trans, iter, dir='./figures/waves', save_figure=True):
+def plot_progress(source, target, trans, iter=0, dir='./figures/waves', save_figure=True):
     
     # visualization from ndarray
     source_pcd = o3d.geometry.PointCloud()
@@ -157,15 +221,14 @@ def plot_progress(source, target, trans, iter, dir='./figures/waves', save_figur
     trans_pcd.paint_uniform_color([0, 0, 1])
     o3d.visualization.draw_geometries([source_pcd, target_pcd, trans_pcd])
 
-    vis = o3d.visualization.Visualizer()
-    vis.create_window()
-    vis.add_geometry(source_pcd)
-    vis.add_geometry(target_pcd)
-    vis.add_geometry(trans_pcd)
-    vis.poll_events()
-    vis.update_renderer()
-
     if save_figure:
+        vis = o3d.visualization.Visualizer()
+        vis.create_window()
+        vis.add_geometry(source_pcd)
+        vis.add_geometry(target_pcd)
+        vis.add_geometry(trans_pcd)
+        vis.poll_events()
+        vis.update_renderer()
         vis.capture_screen_image(dir + f'/prog_{iter}.png')
 
 
@@ -272,10 +335,14 @@ def merge_scene(merge_in_between=False, frame_count=100, step=1, visualize=True)
 
 if __name__ == "__main__":
 
-    merge_scene()
+    # merge_scene()
 
-    # source, target = open_bunny_data()
-    # # source, target = open_wave_data()
-    # R, t = icp(source, target, kd_tree=True, epsilon=1e-8, max_iterations=50)
-    # trans = (R @ source) + t
-    # plot_progress(source, target, trans, iter='last', dir='./figures/bunny', save_figure=True)
+    # source, target = open_wave_data()
+    source, target = open_bunny_data()
+    
+    samplings = ['uniform', 'random', 'multi_res', 'info_reg', 'none']
+    time1 = time.time()
+    R, t = icp(source, target, sampling=samplings[1], epsilon=1e-8, max_iters=50, total_p=source.shape[1] // 100, kd_tree=True)
+    print("Time:", time.time() - time1)
+    trans = (R @ source) + t
+    plot_progress(source, target, trans, dir='./figures/bunny', save_figure=False)
