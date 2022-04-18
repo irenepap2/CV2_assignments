@@ -1,7 +1,7 @@
 import numpy as np
 import open3d as o3d
 from utils import *
-from example import *
+from icp import *
 
 ############################
 #   Merge Scene            #

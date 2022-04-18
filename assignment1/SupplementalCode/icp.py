@@ -153,10 +153,7 @@ def icp(A1, A2, sampling=[], max_iters=50, epsilon=1e-4, total_p=1000, kd_tree=F
 
 if __name__ == "__main__":
 
-    # frame_pcds = get_frame_pointclouds(step=1, frame_count=100) # step = N = {1, 2, 4, 10}
-    # merge_scene(frame_pcds, merge_in_between=True)
-
-    source, target = open_wave_data()
+    # source, target = open_wave_data()
     source, target = open_bunny_data()
     
     samplings = ['uniform', 'random', 'multi_res', 'info_reg', 'none']
