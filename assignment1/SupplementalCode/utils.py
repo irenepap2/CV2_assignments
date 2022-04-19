@@ -48,29 +48,84 @@ def subsample_graph(A1, points=10000):
     return np.array(new_A1)
 
 
-def plot_progress(source, target, trans, file_path='./figures/wave.png', save_figure=True):
-    
+def obtain_informative_regions(A1, A2, alpha, total_p):
+    '''
+    Obtain informative region of mesh and return new array of points.
+    '''
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(A1.T)
+    mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_alpha_shape(pcd, alpha)
+    mesh.compute_vertex_normals()
+    if A1.shape[1] > 2000:
+        num_p = A1.shape[1] // 2000 * 2000
+    else:
+        num_p = A1.shape[1] // 200 * 200
+    pcl = mesh.sample_points_poisson_disk(number_of_points=num_p)
+    hull, _ = pcl.compute_convex_hull()
+    hull_ls = o3d.geometry.LineSet.create_from_triangle_mesh(hull)
+    ls_points = np.asarray(hull_ls.points)
+    new_A1 = informative_region(ls_points)
+    new_A2 = subsample_graph(A2, points=total_p)
+    return np.array(new_A1), np.array(new_A2)
+
+
+def informative_region(points):
+    '''
+    Create new A1 based of calculated informative points
+    '''
+    new_A1 = [[], [], []]
+    for point in points:
+        new_A1[0].append(point[0])
+        new_A1[1].append(point[1])
+        new_A1[2].append(point[2])
+    return new_A1
+
+
+def set_multi_res(A1, epsilon, N):
+    '''
+    Set the sample points and create resolution threshold.
+    '''
+    total_p = A1.shape[1]
+    cur_eps = epsilon
+    points_sampled = []
+    steps = []
+    while total_p > 100:
+        points_sampled.insert(0, total_p)
+        total_p = total_p // N
+        cur_eps *= 2*N
+        steps.insert(0, cur_eps)
+    return points_sampled, steps
+
+
+def plot_progress(source, target, trans, iter=0, dir='./figures/waves', save_figure=True, plot_source=True):
+
     # visualization from ndarray
-    source_pcd = o3d.geometry.PointCloud()
-    source_pcd.points = o3d.utility.Vector3dVector(source.T)
+    if plot_source:
+        source_pcd = o3d.geometry.PointCloud()
+        source_pcd.points = o3d.utility.Vector3dVector(source.T)
     target_pcd = o3d.geometry.PointCloud()
     target_pcd.points = o3d.utility.Vector3dVector(target.T)
     trans_pcd = o3d.geometry.PointCloud()
     trans_pcd.points = o3d.utility.Vector3dVector(trans.T)
-    source_pcd.paint_uniform_color([1, 0, 0])
+    if plot_source:
+        source_pcd.paint_uniform_color([1, 0, 0])
     target_pcd.paint_uniform_color([0, 1, 0])
     trans_pcd.paint_uniform_color([0, 0, 1])
-    o3d.visualization.draw_geometries([source_pcd, target_pcd, trans_pcd])
+    if plot_source:
+        o3d.visualization.draw_geometries([source_pcd, target_pcd, trans_pcd])
+    else:
+        o3d.visualization.draw_geometries([target_pcd, trans_pcd])
 
     if save_figure:
         vis = o3d.visualization.Visualizer()
         vis.create_window()
-        vis.add_geometry(source_pcd)
+        if plot_source:
+            vis.add_geometry(source_pcd)
         vis.add_geometry(target_pcd)
         vis.add_geometry(trans_pcd)
         vis.poll_events()
         vis.update_renderer()
-        vis.capture_screen_image(file_path)
+        vis.capture_screen_image(dir + f'/prog_{iter}.png')
 
 
 def get_frame_pointclouds(step=1, frame_count=100):
