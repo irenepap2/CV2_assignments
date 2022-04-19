@@ -16,7 +16,7 @@ def get_cleaned_pointcloud(path):
 
     # clean the point cloud using a threshold
     dist = np.sqrt(np.sum(pcd_arr ** 2, axis = 1))
-    pcd_arr_cleaned = pcd_arr[dist < 1]
+    pcd_arr_cleaned = pcd_arr[dist < 2]
 
     return pcd_arr_cleaned
 
@@ -36,6 +36,7 @@ def subsample_graph(A1, points=10000):
     '''
     Create reduced point cloud for subsampling
     '''
+
     gen_points = sample(range(0, len(A1[0] - 1)), points)
     new_A1 = np.array([[], [], []])
 
@@ -47,7 +48,7 @@ def subsample_graph(A1, points=10000):
     return np.array(new_A1)
 
 
-def plot_progress(source, target, trans, iter=0, dir='./figures/waves', save_figure=True):
+def plot_progress(source, target, trans, file_path='./figures/wave.png', save_figure=True):
     
     # visualization from ndarray
     source_pcd = o3d.geometry.PointCloud()
@@ -69,7 +70,7 @@ def plot_progress(source, target, trans, iter=0, dir='./figures/waves', save_fig
         vis.add_geometry(trans_pcd)
         vis.poll_events()
         vis.update_renderer()
-        vis.capture_screen_image(dir + f'/prog_{iter}.png')
+        vis.capture_screen_image(file_path)
 
 
 def get_frame_pointclouds(step=1, frame_count=100):

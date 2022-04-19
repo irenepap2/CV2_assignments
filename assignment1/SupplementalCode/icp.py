@@ -40,7 +40,9 @@ def calculate_RMS(source, target):
 
 
 def get_new_R_t(source, target):
-
+    '''
+    Solve for R, t using Singular Value Decomposition
+    '''
     x_centroid = np.mean(source, axis=1)
     y_centroid = np.mean(target, axis=1)
 
@@ -65,7 +67,7 @@ def get_new_R_t(source, target):
     return R, t
 
 
-def icp(A1, A2, sampling=[], max_iters=50, epsilon=1e-4, total_p=1000, kd_tree=False):
+def icp(A1, A2, sampling='none', max_iters=100, epsilon=1e-4, ratio=0.1, kd_tree=False):
     '''
     Perform ICP algorithm to perform Rototranslation.
     
@@ -92,11 +94,11 @@ def icp(A1, A2, sampling=[], max_iters=50, epsilon=1e-4, total_p=1000, kd_tree=F
     R = rotation = np.identity(3)
     t = translation = np.zeros((3,1))
 
-    past_rms = 1
-    
+    past_rms = np.inf
+  
     if sampling == 'uniform':
-        new_A1 = subsample_graph(A1, points=total_p)
-        new_A2 = subsample_graph(A2, points=total_p)
+        new_A1 = subsample_graph(A1, points=int(A1.shape[1] * ratio))
+        new_A2 = subsample_graph(A2, points=int(A2.shape[1] * ratio))
 
     for iter in range(max_iters):
         
@@ -111,8 +113,8 @@ def icp(A1, A2, sampling=[], max_iters=50, epsilon=1e-4, total_p=1000, kd_tree=F
 
         # Random sampling
         elif sampling == 'random':
-            new_A1 = subsample_graph(A1, points=total_p)
-            new_A2 = subsample_graph(A2, points=total_p)
+            new_A1 = subsample_graph(A1, points=int(A1.shape[1] * ratio))
+            new_A2 = subsample_graph(A2, points=int(A2.shape[1] * ratio))
 
         # No sampling (brute force)
         else:
@@ -125,13 +127,10 @@ def icp(A1, A2, sampling=[], max_iters=50, epsilon=1e-4, total_p=1000, kd_tree=F
             matches = calculate_closest_points(new_A1, new_A2)
 
         # 4. Calculate RMS
-        if sampling and sampling != 'none':
-            rms = calculate_RMS(new_A1, matches)
-        else:
-            rms = calculate_RMS(A1, matches)
+        rms = calculate_RMS(new_A1, matches)
 
-        # 5. Check if RMS is unchanged or within threshold
         print('Iter', iter, 'RMS', rms)
+        # 5. Check if RMS is unchanged or within threshold
         if abs(past_rms-rms) < epsilon:
             break
         
@@ -151,14 +150,18 @@ def icp(A1, A2, sampling=[], max_iters=50, epsilon=1e-4, total_p=1000, kd_tree=F
 #  Additional Improvements #
 ############################
 
+
 if __name__ == "__main__":
 
     # source, target = open_wave_data()
     source, target = open_bunny_data()
+
+    # source = subsample_graph(source, points=int(source.shape[1] * 0.85))
+    # target = subsample_graph(target, points=int(source.shape[1] * 0.85))
     
     samplings = ['uniform', 'random', 'multi_res', 'info_reg', 'none']
     time1 = time.time()
-    R, t = icp(source, target, sampling=samplings[1], epsilon=1e-10, max_iters=50, total_p=source.shape[1] // 100, kd_tree=True)
+    R, t = icp(source, target, sampling=samplings[4], epsilon=1e-8, max_iters=50, ratio=0.1, kd_tree=False)
     print("Time:", time.time() - time1)
     trans = (R @ source) + t
-    plot_progress(source, target, trans, dir='./figures/bunny', save_figure=False)
+    plot_progress(source, target, trans, file_path='./figures/wave.png', save_figure=False)
