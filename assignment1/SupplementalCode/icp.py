@@ -67,10 +67,10 @@ def get_new_R_t(source, target):
     return R, t
 
 
-def icp(A1, A2, sampling='none', max_iters=100, epsilon=1e-4, ratio=0.1, kd_tree=False):
+def icp(A1, A2, sampling=[], max_iters=50, epsilon=1e-4, ratio=0.1, kd_tree=False, N=4, alpha=0.3, noise=False, noise_max=0.1):
     '''
     Perform ICP algorithm to perform Rototranslation.
-    
+
     input:
         - A1:          The source image.
         - A2:          The target image.
@@ -78,11 +78,14 @@ def icp(A1, A2, sampling='none', max_iters=100, epsilon=1e-4, ratio=0.1, kd_tree
                                             'info_reg', 'none'].
         - max_iters:   Max iterations the ICP can run.
         - epsilon:     Error threshold.
-        - dist:        Total points to use for sampling.
+        - ratio:       Total % of points to use for sampling.
         - kd_tree:     Determine whether kd_tree algorithm used for
                        point matching.
-        - N:           Something with multiRes TODO.
-    
+        - N:           Determines step size of multi-res.
+        - alpha:       Set the alpha value for the triangle mesh.
+        - noise        Set whether noise is added.
+        - noise_max    Set the amount of noise.
+
     output:
         - rotation:    Final rotation.
         - translation: Final translation.
@@ -99,6 +102,15 @@ def icp(A1, A2, sampling='none', max_iters=100, epsilon=1e-4, ratio=0.1, kd_tree
     if sampling == 'uniform':
         new_A1 = subsample_graph(A1, points=int(A1.shape[1] * ratio))
         new_A2 = subsample_graph(A2, points=int(A2.shape[1] * ratio))
+        
+    if sampling == 'info_reg':
+        new_A1, new_A2 = obtain_informative_regions(A1, A2, alpha, int(A1.shape[1] * ratio))
+
+    if sampling == 'multi_res':
+        points_sampled, steps = set_multi_res(A1, epsilon, N)
+        cur_step = 0
+        new_A1 = subsample_graph(A1, points=points_sampled[cur_step])
+        new_A2 = subsample_graph(A2, points=points_sampled[cur_step])
 
     for iter in range(max_iters):
         
@@ -107,14 +119,22 @@ def icp(A1, A2, sampling='none', max_iters=100, epsilon=1e-4, ratio=0.1, kd_tree
 
         # 3. Find the closest point for each point in A1 based on A2 using different approaches
 
-        # Uniform sampling
-        if sampling == 'uniform':
+        # Uniform sampling and sampling based on informative regions.
+        if sampling == 'uniform' or sampling == 'info_reg':
             new_A1 = R @ new_A1 + t
 
         # Random sampling
         elif sampling == 'random':
             new_A1 = subsample_graph(A1, points=int(A1.shape[1] * ratio))
             new_A2 = subsample_graph(A2, points=int(A2.shape[1] * ratio))
+        
+        # Multi resolution
+        elif sampling == 'multi_res':
+            new_A1 = subsample_graph(A1, points=points_sampled[cur_step])
+            if points_sampled[cur_step] <= A2.shape[1]:
+                new_A2 = subsample_graph(A2, points=points_sampled[cur_step])
+            else:
+                new_A2 = subsample_graph(A2, points=A2.shape[1])
 
         # No sampling (brute force)
         else:
@@ -128,6 +148,12 @@ def icp(A1, A2, sampling='none', max_iters=100, epsilon=1e-4, ratio=0.1, kd_tree
 
         # 4. Calculate RMS
         rms = calculate_RMS(new_A1, matches)
+        
+        # Move in the sampling amount dependent on RMS for multi-res.
+        if sampling == 'multi_res':
+            # Increase points sampled
+            while cur_step != len(steps) - 1 and np.abs(rms-past_rms) < steps[cur_step]:
+                cur_step += 1
 
         print('Iter', iter, 'RMS', rms)
         # 5. Check if RMS is unchanged or within threshold
