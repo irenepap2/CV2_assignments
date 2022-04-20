@@ -190,4 +190,4 @@ if __name__ == "__main__":
     R, t = icp(source, target, sampling=samplings[4], epsilon=1e-8, max_iters=50, ratio=0.1, kd_tree=False)
     print("Time:", time.time() - time1)
     trans = (R @ source) + t
-    plot_progress(source, target, trans, file_path='./figures/wave.png', save_figure=False)
+    plot_progress(source, target, trans, dir='./figures/wave.png', save_figure=False)
