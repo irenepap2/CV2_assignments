@@ -52,20 +52,30 @@ def obtain_informative_regions(A1, A2, alpha, total_p):
     '''
     Obtain informative region of mesh and return new array of points.
     '''
+    # obtain pointcloud
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(A1.T)
+
+    # create mesh from pointcloud
     mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_alpha_shape(pcd, alpha)
     mesh.compute_vertex_normals()
+
+    # set the number of points to sample
     if A1.shape[1] > 2000:
         num_p = A1.shape[1] // 2000 * 2000
     else:
         num_p = A1.shape[1] // 200 * 200
+
+    # sample points and create line set
     pcl = mesh.sample_points_poisson_disk(number_of_points=num_p)
     hull, _ = pcl.compute_convex_hull()
     hull_ls = o3d.geometry.LineSet.create_from_triangle_mesh(hull)
+
+    # extract points from line set and create new A1 and A2
     ls_points = np.asarray(hull_ls.points)
     new_A1 = informative_region(ls_points)
     new_A2 = subsample_graph(A2, points=total_p)
+
     return np.array(new_A1), np.array(new_A2)
 
 
@@ -95,6 +105,20 @@ def set_multi_res(A1, epsilon, N):
         cur_eps *= 2*N
         steps.insert(0, cur_eps)
     return points_sampled, steps
+
+
+def gauss_noise(A1, ratio=0.1):
+    '''
+    Add a ratio of noise to the image.
+    '''
+    noise_len = int(ratio*len(A1[0]))
+    A1_X = np.random.normal(np.mean(A1[0]), np.std(A1[0]), (noise_len, 1))
+    A1_Y = np.random.normal(np.mean(A1[1]), np.std(A1[1]), (noise_len, 1))
+    A1_Z = np.random.normal(np.mean(A1[2]), np.std(A1[2]), (noise_len, 1))
+    noise = np.array([A1_X, A1_Y, A1_Z])
+    A1_noised = np.vstack((A1, noise))
+
+    return np.array(A1_noised)
 
 
 def plot_progress(source, target, trans, iter=0, dir='./figures/waves', save_figure=True, plot_source=True):
