@@ -67,7 +67,7 @@ def get_new_R_t(source, target):
     return R, t
 
 
-def icp(A1, A2, sampling=[], max_iters=50, epsilon=1e-4, ratio=0.1, kd_tree=False, N=4, alpha=0.3, noise=False, noise_max=0.1):
+def icp(A1, A2, sampling='none', max_iters=50, epsilon=1e-4, ratio=0.1, kd_tree=False, N=4, alpha=0.3, noise=False, noise_max=0.1, print_rms=True):
     '''
     Perform ICP algorithm to perform Rototranslation.
 
@@ -85,19 +85,25 @@ def icp(A1, A2, sampling=[], max_iters=50, epsilon=1e-4, ratio=0.1, kd_tree=Fals
         - alpha:       Set the alpha value for the triangle mesh.
         - noise        Set whether noise is added.
         - noise_max    Set the amount of noise.
+        - print_rms    Print the RMS each iter if true.
 
     output:
         - rotation:    Final rotation.
         - translation: Final translation.
+        - all_rms:     RMS value at each iteration.
     '''
 
     ###### 0. (adding noise)
+    if noise:
+        A1 = gauss_noise(A1, noise_max)
+        A2 = gauss_noise(A1, noise_max)
 
     ###### 1. initialize R= I , t= 0
     R = rotation = np.identity(3)
     t = translation = np.zeros((3,1))
 
     past_rms = np.inf
+    all_rms = []
   
     if sampling == 'uniform':
         new_A1 = subsample_graph(A1, points=int(A1.shape[1] * ratio))
@@ -130,11 +136,7 @@ def icp(A1, A2, sampling=[], max_iters=50, epsilon=1e-4, ratio=0.1, kd_tree=Fals
         
         # Multi resolution
         elif sampling == 'multi_res':
-            new_A1 = subsample_graph(A1, points=points_sampled[cur_step])
-            if points_sampled[cur_step] <= A2.shape[1]:
-                new_A2 = subsample_graph(A2, points=points_sampled[cur_step])
-            else:
-                new_A2 = subsample_graph(A2, points=A2.shape[1])
+            new_A1 = R @ new_A1 + t
 
         # No sampling (brute force)
         else:
@@ -148,28 +150,39 @@ def icp(A1, A2, sampling=[], max_iters=50, epsilon=1e-4, ratio=0.1, kd_tree=Fals
 
         # 4. Calculate RMS
         rms = calculate_RMS(new_A1, matches)
-        
-        # Move in the sampling amount dependent on RMS for multi-res.
-        if sampling == 'multi_res':
-            # Increase points sampled
-            while cur_step != len(steps) - 1 and np.abs(rms-past_rms) < steps[cur_step]:
-                cur_step += 1
+        all_rms.append(rms)
 
-        print('Iter', iter, 'RMS', rms)
+        if print_rms:
+            print('Iter', iter, 'RMS', rms)
+        if abs(past_rms-rms) < epsilon:
+            break
+
         # 5. Check if RMS is unchanged or within threshold
         if abs(past_rms-rms) < epsilon:
             break
         
+        past_rms_x = past_rms
         past_rms = rms
 
         # 6. Refine R and t using SVD
         R, t = get_new_R_t(new_A1, matches)
+        
+        # Move in the sampling amount dependent on RMS for multi-res.
+        if sampling == 'multi_res':
+            # Increase points sampled
+            if cur_step != len(steps) - 1 and np.abs(rms-past_rms_x) < steps[cur_step]:
+                cur_step += 1
+                new_A1 = subsample_graph(A1, points=points_sampled[cur_step])
+                if points_sampled[cur_step] <= A2.shape[1]:
+                    new_A2 = subsample_graph(A2, points=points_sampled[cur_step])
+                else:
+                    new_A2 = subsample_graph(A2, points=A2.shape[1])
 
         # 7. Update rotation and translation
         rotation = R @ rotation
         translation = R @ translation + t
 
-    return rotation, translation
+    return rotation, translation, all_rms
 
 
 ############################
@@ -187,7 +200,7 @@ if __name__ == "__main__":
     
     samplings = ['uniform', 'random', 'multi_res', 'info_reg', 'none']
     time1 = time.time()
-    R, t = icp(source, target, sampling=samplings[4], epsilon=1e-8, max_iters=50, ratio=0.1, kd_tree=False)
+    R, t, _ = icp(source, target, sampling=samplings[4], epsilon=1e-8, max_iters=50, ratio=0.1, kd_tree=False)
     print("Time:", time.time() - time1)
     trans = (R @ source) + t
     plot_progress(source, target, trans, dir='./figures/wave.png', save_figure=False)
