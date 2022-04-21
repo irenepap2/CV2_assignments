@@ -13,7 +13,7 @@ def plot_results(sampling, save_fig, idxs, vals, noise):
         title = 'kd-tree'
 
     if noise:
-        title = "noised " + title
+        title = "noised" + title
 
     if len(idxs) > 1:
         if noise:
