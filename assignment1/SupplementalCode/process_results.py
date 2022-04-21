@@ -33,7 +33,7 @@ def plot_results(sampling, save_fig, idxs, vals, noise):
 
     plt.title(title)
     plt.xlabel("iteration")
-    plt.ylabel("RMS")
+    plt.ylabel("Avg. RMS")
     plt.legend()
     plt.xlim([0, 100])
 
