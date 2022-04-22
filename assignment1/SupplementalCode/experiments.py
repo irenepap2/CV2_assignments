@@ -35,9 +35,9 @@ def write_results(source, target, sample, f, g, ratio=None, noise=False, noise_m
         time1 = time.time()
 
         if not ratio:
-            _, _, rms = icp(source, target, sampling=sample, epsilon=1e-8, max_iters=100, ratio=0.01, kd_tree=True, print_rms=False, noise=noise, noise_max=noise_max)
+            _, _, rms = icp(source, target, sampling=sample, epsilon=1e-8, max_iters=100, ratio=0.01, mode='kd_tree', print_rms=False, noise=noise, noise_max=noise_max)
         else:
-            _, _, rms = icp(source, target, sampling=sample, epsilon=1e-8, max_iters=100, ratio=ratio, kd_tree=True, print_rms=False)
+            _, _, rms = icp(source, target, sampling=sample, epsilon=1e-8, max_iters=100, ratio=ratio, mode='kd_tree', print_rms=False)
 
         time2 = time.time()
         results.append(rms)
@@ -53,7 +53,7 @@ def write_results(source, target, sample, f, g, ratio=None, noise=False, noise_m
     return
 
 
-def obtain_results(source, target, samplings, noise=False, z_buff=False):
+def obtain_results(source, target, samplings, noise=False, mode='kd_tree'):
     '''
     Obtain results and write them to file
     '''
@@ -106,8 +106,8 @@ if __name__ == "__main__":
     If you want to reduce this dont run the noised versions (especially of
     random sampling).
     '''
-    # source, target = open_wave_data()
-    source, target = open_bunny_data()
+    # source, target, _ = open_wave_data()
+    source, target, _ = open_bunny_data()
     # samplings = ['uniform', 'random', 'multi_res', 'info_reg', 'none']
     # obtain_results(source, target, samplings, noise=False)
     # obtain_results(source, target, samplings, noise=True)
