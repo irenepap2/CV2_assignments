@@ -114,13 +114,16 @@ def gauss_noise(A1, ratio=0.1):
     Add a ratio of noise to the image.
     '''
     noise_len = int(ratio*len(A1[0]))
-    A1_X = np.random.normal(np.mean(A1[0]), np.std(A1[0]), (noise_len, 1))
-    A1_Y = np.random.normal(np.mean(A1[1]), np.std(A1[1]), (noise_len, 1))
-    A1_Z = np.random.normal(np.mean(A1[2]), np.std(A1[2]), (noise_len, 1))
-    noise = np.array([A1_X, A1_Y, A1_Z])
-    A1_noised = np.vstack((A1, noise))
+    A1_X = np.random.normal(np.mean(A1[0]) * 0.05, np.std(A1[0]) * 0.05, (noise_len, 1))
+    A1_Y = np.random.normal(np.mean(A1[1]) * 0.05, np.std(A1[1]) * 0.05, (noise_len, 1))
+    A1_Z = np.random.normal(np.mean(A1[2]) * 0.05, np.std(A1[2]) * 0.05, (noise_len, 1))
+    gen_points = sample(range(0, len(A1[0] - 1)), noise_len)
+    for i, point in enumerate(gen_points):
+        A1[0][point] += A1_X[i]
+        A1[1][point] += A1_Y[i]
+        A1[2][point] += A1_Z[i]
 
-    return np.array(A1_noised)
+    return A1
 
 
 def plot_progress(source, target, trans, iter=0, dir='./figures/waves', save_figure=True, plot_source=True):
