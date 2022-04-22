@@ -7,14 +7,14 @@ from icp import *
 #   Merge Scene            #
 ############################
 
-def estimate_transformations(frame_pcds, epsilon, max_iters, kd_tree):
+def estimate_transformations(frame_pcds, epsilon, max_iters, mode):
     
     #  Estimate the camera poses using two consecutive frames of given data.
     rotations = []
     translations = []
     for i in range(len(frame_pcds)-1):
         print('Frame ', i+1)
-        R, t, _ = icp(frame_pcds[i], frame_pcds[i+1], kd_tree=kd_tree, epsilon=epsilon, max_iters=max_iters)
+        R, t, _ = icp(frame_pcds[i], frame_pcds[i+1], mode=mode, epsilon=epsilon, max_iters=max_iters)
         rotations.append(R)
         translations.append(t)
     
@@ -30,7 +30,7 @@ def merge_scene_in_between(frame_pcds, epsilon=1e-7, max_iters=100, visualize=Tr
     source_frame = frame_pcds[0]
     for i, frame in enumerate(frame_pcds[1:]):
         print("Frame:", i+1)
-        R, t, _ = icp(source_frame, frame, sampling='none', ratio=0.1, kd_tree=True, epsilon=epsilon, max_iters=max_iters)
+        R, t, _ = icp(source_frame, frame, sampling='none', ratio=0.1, mode='kd_tree', epsilon=epsilon, max_iters=max_iters)
         new_source = R @ source_frame + t
         source_frame = np.hstack((new_source, frame))
         
@@ -59,7 +59,7 @@ def merge_scene_end(frame_pcds, epsilon=1e-7, max_iters=100, visualize=True):
         print("Frame:", i+1)
         source = frame_pcds[i]
         target = frame_pcds[i+1]
-        R, t, _ = icp(source, target, kd_tree=True, epsilon=epsilon, max_iters=max_iters)
+        R, t, _ = icp(source, target, mode='kd_tree', epsilon=epsilon, max_iters=max_iters)
         trans = R @ source + t
         if i == 0:
             merged_pcd = trans
