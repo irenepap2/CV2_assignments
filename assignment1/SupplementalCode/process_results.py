@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 
-DATA_DIR = './textfiles/'
+DATA_DIR = './Data/textfiles/'
 
 
 def plot_results(sampling, save_fig, idxs, vals, noise):
@@ -43,7 +43,7 @@ def plot_results(sampling, save_fig, idxs, vals, noise):
     plt.xlim([0, 100])
 
     if save_fig:
-        save_name = './figures/plots/' + title + '.png'
+        save_name = './Data/figures/plots/' + title + '.png'
         plt.savefig(save_name)
     else:
         plt.show()

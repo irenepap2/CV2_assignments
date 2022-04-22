@@ -4,7 +4,7 @@ import open3d as o3d
 from random import sample
 
 # globals.
-DATA_DIR = '../Data'
+DATA_DIR = './Data'
 FRAMES_PATH = DATA_DIR + '/data/'
 
 # == Load data ==
@@ -20,18 +20,17 @@ def get_cleaned_pointcloud(path):
 
     return pcd_arr_cleaned
 
+
 def open_wave_data():
     target = np.load(os.path.join(DATA_DIR, 'wave_target.npy'))
     source = np.load(os.path.join(DATA_DIR, 'wave_source.npy'))
-    save_dir = './figures/waves'
-    return source, target, save_dir
+    return source, target
 
 
 def open_bunny_data():
     target = np.load(os.path.join(DATA_DIR, 'bunny_target.npy'))
     source = np.load(os.path.join(DATA_DIR, 'bunny_source.npy'))
-    save_dir = './figures/bunnies'
-    return source, target, save_dir
+    return source, target
 
 
 def subsample_graph(A1, points=10000):
@@ -104,7 +103,7 @@ def set_multi_res(A1, epsilon, N):
     while total_p > 100:
         points_sampled.insert(0, total_p)
         total_p = total_p // N
-        cur_eps *= 2*N
+        cur_eps *= N
         steps.insert(0, cur_eps)
     return points_sampled, steps
 
@@ -126,7 +125,7 @@ def gauss_noise(A1, ratio=0.1):
     return A1
 
 
-def plot_progress(source, target, trans, iter=0, dir='./figures/waves', save_figure=True, plot_source=True):
+def plot_progress(source, target, trans, file_path='./figures/wave_basic.png', save_figure=False, plot_source=True):
 
     # visualization from ndarray
     if plot_source:
@@ -154,7 +153,7 @@ def plot_progress(source, target, trans, iter=0, dir='./figures/waves', save_fig
         vis.add_geometry(trans_pcd)
         vis.poll_events()
         vis.update_renderer()
-        vis.capture_screen_image(dir + f'/prog_{iter}.png')
+        vis.capture_screen_image(file_path)
 
 
 def get_frame_pointclouds(step=1, frame_count=100):

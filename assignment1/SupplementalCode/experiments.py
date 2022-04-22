@@ -3,8 +3,7 @@ from utils import *
 import time
 import numpy as np
 
-DATA_DIR = './textfiles/'
-
+DATA_DIR = './Data/textfiles/'
 
 def obtain_avgs(array_set):
     '''
@@ -36,9 +35,9 @@ def icp_results(source, target, sample, ratio=None, noise=False, noise_max=0):
         time1 = time.time()
 
         if not ratio:
-            _, _, rms = icp(source, target, sampling=sample, epsilon=1e-8, max_iters=100, ratio=0.01, kd_tree=True, print_rms=False, noise=noise, noise_max=noise_max)
+            _, _, rms = icp(source, target, sampling=sample, epsilon=1e-8, max_iters=100, ratio=0.01, mode='kd_tree', print_rms=False, noise=noise, noise_max=noise_max)
         else:
-            _, _, rms = icp(source, target, sampling=sample, epsilon=1e-8, max_iters=100, ratio=ratio, kd_tree=True, print_rms=False)
+            _, _, rms = icp(source, target, sampling=sample, epsilon=1e-8, max_iters=100, ratio=ratio, mode='kd_tree', print_rms=False)
 
         time2 = time.time()
         results.append(rms)
@@ -137,7 +136,7 @@ def write_files(file, sampling, result_l, noise):
             # obtain subsampling results with different ratios
             else:
                 ratios = [0.01, 0.1, 0.25, 0.5, 0.75]
-                for ratio in ratios:
+                for i, ratio in enumerate(ratios):
                     f.write("Ratio: " + str(ratio) + '\n')
                     g.write("Ratio: " + str(ratio) + '\n')
                     f.write('Average time: ' + str(result_l[2][i]) + '\n')

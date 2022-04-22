@@ -140,7 +140,7 @@ def get_new_R_t(source, target):
     U, _, Vt = np.linalg.svd(A)
 
     I = np.eye(Vt.shape[1])
-    I[-1, -1] = 1/np.linalg.det(Vt.T @ U.T)
+    I[-1, -1] = np.linalg.det(Vt.T @ U.T)
 
     R = Vt.T @ I @ U.T
 
@@ -150,7 +150,8 @@ def get_new_R_t(source, target):
     return R, t
 
 
-def icp(A1, A2, sampling='none', max_iters=50, epsilon=1e-4, ratio=0.1, mode='kd_tree', N=4, alpha=0.3, noise=False, noise_max=0.1, print_rms=True):
+def icp(A1, A2, sampling='none', max_iters=50, epsilon=1e-4, ratio=0.1, mode='', N=4, alpha=0.3, noise=False, noise_max=0.1, print_rms=True):
+
     '''
     Perform ICP algorithm to perform Rototranslation.
 
@@ -272,18 +273,20 @@ def icp(A1, A2, sampling='none', max_iters=50, epsilon=1e-4, ratio=0.1, mode='kd
     return rotation, translation, all_rms
 
 
-############################
-#  Additional Improvements #
-############################
-
-
 if __name__ == "__main__":
+    
+    #1.1 Results
+    source, target = open_wave_data()
 
-    # source, target, save_dir = open_wave_data()
-    source, target, save_dir = open_bunny_data()
-    samplings = ['uniform', 'random', 'multi_res', 'info_reg', 'none']
+    # Uncommend following lines to see bunny results (all points or downsampled)
+    # Note that this takes time
+
+    # source, target = open_bunny_data()
+    # source = subsample_graph(source, points=int(source.shape[1] * 0.85))
+    # target = subsample_graph(target, points=int(source.shape[1] * 0.85))
+    
     time1 = time.time()
-    R, t, _ = icp(source, target, sampling='none', epsilon=1e-8, max_iters=50, ratio=0.1, mode='kd_tree')
+    R, t, _ = icp(source, target, epsilon=1e-4, max_iters=50)
     print("Time:", time.time() - time1)
     trans = (R @ source) + t
-    plot_progress(source, target, trans, dir=save_dir, save_figure=False)
+    plot_progress(source, target, trans, plot_source=False)
