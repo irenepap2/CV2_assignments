@@ -18,6 +18,7 @@
 - none                        : no sampling
 
 //////////// icp.py ///////////////////////
+
 To obtain results for section 1.1 simply run the icp.py.
 
 //////////// experiments.py ///////////////////////
@@ -38,6 +39,7 @@ If you want to simply view these plots but not save them you can set save_fig to
 shown directly instead.
 
 //////////// global_registration.py ///////////////////////
+
 To obtain results for section 3.1 and 3.2 simply run the global_registration.py.
 Change the N to the desired value to get the different visualizations.
 For convenience, the file loads precomputed .npy arrays in which the merged point clouds for diffrent N are saved.
