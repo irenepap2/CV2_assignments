@@ -15,6 +15,8 @@ def plot_results(sampling, save_fig, idxs, vals, noise):
     if noise:
         title = "noised" + title
 
+    print(title)
+
     if len(idxs) > 1:
         if noise:
             vars = [0.1, 0.25, 0.5, 0.75]
@@ -25,11 +27,14 @@ def plot_results(sampling, save_fig, idxs, vals, noise):
             cur_vals = vals[i][:idxs[i]]
             x = [i for i in range(len(cur_vals))]
             plt.plot(x, cur_vals, label=str(vars[i]))
+            print(str(vars[i]))
+            print("Final RMS:", cur_vals[-1])
 
     else:
         cur_vals = vals[0][:idxs[0]]
         x = [i for i in range(len(cur_vals))]
         plt.plot(x, cur_vals, label=title)
+        print("Final RMS:", cur_vals[-1])
 
     plt.title(title)
     plt.xlabel("iteration")
