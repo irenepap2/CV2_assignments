@@ -30,6 +30,6 @@ To test the subsampling, you can run the experiments.py. In the main section of 
 
 ///////////////////////////////////////////////////
 
-To obtain the results either uncomment obtain_results(source, target, samplings, noise=False) for the non noised versions or obtain_results(source, target, samplings, noise=True) for the noised versions. Keep in mind that running this will take significant time, especially for random subsampling on the noised tests, so it might be better to only test half of the methods on each version. These will then be saved to /SupplementalCode/textfiles with their mean data and raw data seperately.
+To obtain the results either uncomment obtain_results(source, target, samplings, noise=False) for the non noised versions or obtain_results(source, target, samplings, noise=True) for the noised versions. Keep in mind that running this will take some time, so it might be better to only test half of the methods on each version if you want quick results to compare. These will then be saved to /SupplementalCode/textfiles with their mean data and raw data seperately.
 
 In order to obtain the graphs, simply run process_results.py to save the graphs to /SupplementalCode/figures/plots for each tested method. If you want to simply view these plots but not save them you can set save_fig to False, and the results will be plotted and shown directly instead.
