@@ -23,13 +23,15 @@ def get_cleaned_pointcloud(path):
 def open_wave_data():
     target = np.load(os.path.join(DATA_DIR, 'wave_target.npy'))
     source = np.load(os.path.join(DATA_DIR, 'wave_source.npy'))
-    return source, target
+    save_dir = './figures/waves'
+    return source, target, save_dir
 
 
 def open_bunny_data():
     target = np.load(os.path.join(DATA_DIR, 'bunny_target.npy'))
     source = np.load(os.path.join(DATA_DIR, 'bunny_source.npy'))
-    return source, target
+    save_dir = './figures/bunnies'
+    return source, target, save_dir
 
 
 def subsample_graph(A1, points=10000):
