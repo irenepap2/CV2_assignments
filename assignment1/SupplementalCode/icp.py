@@ -179,7 +179,7 @@ def icp(A1, A2, sampling='none', max_iters=50, epsilon=1e-4, ratio=0.1, mode='kd
     ###### 0. (adding noise)
     if noise:
         A1 = gauss_noise(A1, noise_max)
-        A2 = gauss_noise(A1, noise_max)
+        A2 = gauss_noise(A2, noise_max)
 
     ###### 1. initialize R= I , t= 0
     R = rotation = np.identity(3)
