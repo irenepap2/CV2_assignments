@@ -4,7 +4,7 @@ import open3d as o3d
 from random import sample
 
 # globals.
-DATA_DIR = 'Data'
+DATA_DIR = '../Data'
 FRAMES_PATH = DATA_DIR + '/data/'
 
 # == Load data ==
