@@ -280,7 +280,7 @@ if __name__ == "__main__":
 
     # Uncommend following lines to see bunny results (all points or downsampled)
     # Note that this takes time
-    
+
     # source, target = open_bunny_data()
     # source = subsample_graph(source, points=int(source.shape[1] * 0.85))
     # target = subsample_graph(target, points=int(source.shape[1] * 0.85))
