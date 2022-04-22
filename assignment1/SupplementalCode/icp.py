@@ -274,13 +274,13 @@ def icp(A1, A2, sampling='none', max_iters=50, epsilon=1e-4, ratio=0.1, mode='',
 
 
 if __name__ == "__main__":
-    
+
     #1.1 Results
     source, target = open_wave_data()
 
     # Uncommend following lines to see bunny results (all points or downsampled)
     # Note that this takes time
-
+    
     # source, target = open_bunny_data()
     # source = subsample_graph(source, points=int(source.shape[1] * 0.85))
     # target = subsample_graph(target, points=int(source.shape[1] * 0.85))
