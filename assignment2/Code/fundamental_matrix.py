@@ -36,7 +36,7 @@ def calculate_keypoint_matching(img1, img2, dist_ratio):
     # cv.drawMatchesKnn expects list of lists as matches.
     img3 = cv.drawMatchesKnn(img1, kp1, img2, kp2, good, None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
     plt.imshow(img3)
-    plt.show()
+    # plt.show()
 
     points1 = np.array(points1)
     points2 = np.array(points2)
@@ -49,11 +49,19 @@ def calculate_keypoint_matching(img1, img2, dist_ratio):
 
 
 def findFundamentalMatrixOpenCV(points1, points2):
+    '''
+    Computes Fundamental Matrix using the opencv function
+    '''
+
     F, _ = cv.findFundamentalMat(points1, points2)
     return F
 
 
 def findFundamentalMatrixEightPointAlgo(points1, points2):
+    '''
+    Computes Fundamental Matrix using the EPA algorithm (3.1)
+    '''
+
     # construct the nx9 matrix A
     A = np.array([points1[:,0] * points2[:,0], 
                   points1[:,0] * points2[:,1], 
@@ -63,11 +71,22 @@ def findFundamentalMatrixEightPointAlgo(points1, points2):
                   points1[:,1], 
                   points2[:,0], 
                   points2[:,1], 
-                  np.ones((len(points1)))])
+                  np.ones((len(points1)))]).T
 
-    U, D, Vt = np.linalg.svd(A)
+    _, _, Vt = np.linalg.svd(A)
     V = Vt.T
+    # The entries of F are the components of the column of V corresponding to the smallest singular value (last value in D)
+    F = V[:,-1].reshape(3,3)
 
+    # Find the SVD of F
+    Uf, Df, Vft = np.linalg.svd(F)
+    # Set the smallest singular value in the diagonal matrix Df to zero
+    Df[-1] = 0
+    # Recompute F
+    F = Uf @ np.diag(Df) @ Vft
+
+    return F
+    
 
 def plot_epipolar_lines(img1, img2, points, F_matrix):
 
@@ -102,7 +121,8 @@ if __name__ == '__main__':
     
     #calculate matching keypoints
     points1, points2 = calculate_keypoint_matching(img1, img2, dist_ratio)
-    F_matrix = findFundamentalMatrixOpenCV(points1, points2)
+    # F_matrix = findFundamentalMatrixOpenCV(points1, points2)
+    F_matrix = findFundamentalMatrixEightPointAlgo(points1, points2)
     plot_epipolar_lines(img1.copy(), img2.copy(), points2, F_matrix)
     plot_epipolar_lines(img2.copy(), img1.copy(), points1, F_matrix)
 
