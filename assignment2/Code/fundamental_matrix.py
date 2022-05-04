@@ -3,7 +3,6 @@ import cv2 as cv
 import matplotlib.pyplot as plt
 import random
 
-
 def calculate_keypoint_matching(img1, img2, dist_ratio):
     '''
     Finds the keypoints between the two images img1 and img2
@@ -48,6 +47,26 @@ def calculate_keypoint_matching(img1, img2, dist_ratio):
     return points1, points2
 
 
+def normalize_points(points):
+    '''
+    Normalizes points so that their mean is 0 and average distance to the mean is sqrt(2)
+    '''
+
+    x = points[:,0]
+    y = points[:,1]
+    m_x = np.mean(x)
+    m_y = np.mean(y)
+    d = np.mean(np.sqrt((x - m_x)**2 + (y - m_y)**2))
+
+    T = np.array([[np.sqrt(2)/d, 0, -m_x*np.sqrt(2)/d], 
+                  [0, np.sqrt(2)/d, -m_y*np.sqrt(2)/d], 
+                  [0, 0, 1]])
+
+    points_normalized = points @ T
+    
+    return points_normalized, T
+
+
 def findFundamentalMatrixOpenCV(points1, points2):
     '''
     Computes Fundamental Matrix using the opencv function
@@ -57,11 +76,16 @@ def findFundamentalMatrixOpenCV(points1, points2):
     return F
 
 
-def findFundamentalMatrixEightPointAlgo(points1, points2):
+def findFundamentalMatrixEightPointAlgo(points1, points2, normalize=False):
     '''
     Computes Fundamental Matrix using the EPA algorithm (3.1)
+    If normalize=True, it normalizes points1 and points2 and then computes the Fundamental Matrix (3.2)
     '''
 
+    if normalize:
+        points1, T1 = normalize_points(points1)
+        points2, T2 = normalize_points(points2)
+    
     # construct the nx9 matrix A
     A = np.array([points1[:,0] * points2[:,0], 
                   points1[:,0] * points2[:,1], 
@@ -74,9 +98,8 @@ def findFundamentalMatrixEightPointAlgo(points1, points2):
                   np.ones((len(points1)))]).T
 
     _, _, Vt = np.linalg.svd(A)
-    V = Vt.T
     # The entries of F are the components of the column of V corresponding to the smallest singular value (last value in D)
-    F = V[:,-1].reshape(3,3)
+    F = Vt.T[:,-1].reshape(3,3)
 
     # Find the SVD of F
     Uf, Df, Vft = np.linalg.svd(F)
@@ -85,8 +108,10 @@ def findFundamentalMatrixEightPointAlgo(points1, points2):
     # Recompute F
     F = Uf @ np.diag(Df) @ Vft
 
+    if normalize:
+        F = T2.T @ F @ T1
     return F
-    
+
 
 def plot_epipolar_lines(img1, img2, points, F_matrix):
 
@@ -121,8 +146,9 @@ if __name__ == '__main__':
     
     #calculate matching keypoints
     points1, points2 = calculate_keypoint_matching(img1, img2, dist_ratio)
-    # F_matrix = findFundamentalMatrixOpenCV(points1, points2)
-    F_matrix = findFundamentalMatrixEightPointAlgo(points1, points2)
+    F_matrix = findFundamentalMatrixOpenCV(points1, points2)
     plot_epipolar_lines(img1.copy(), img2.copy(), points2, F_matrix)
-    plot_epipolar_lines(img2.copy(), img1.copy(), points1, F_matrix)
+    F_matrix = findFundamentalMatrixEightPointAlgo(points1.copy(), points2.copy(), normalize=True)
+    plot_epipolar_lines(img1.copy(), img2.copy(), points2, F_matrix)
+    # plot_epipolar_lines(img2.copy(), img1.copy(), points1, F_matrix)
 
