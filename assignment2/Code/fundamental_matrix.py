@@ -2,6 +2,7 @@ import numpy as np
 import cv2 as cv
 import matplotlib.pyplot as plt
 import random
+from utils import *
 
 def calculate_keypoint_matching(img1, img2, dist_ratio):
     '''
@@ -62,9 +63,11 @@ def normalize_points(points):
                   [0, np.sqrt(2)/d, -m_y*np.sqrt(2)/d], 
                   [0, 0, 1]])
 
-    points_normalized = points @ T
+    points_normalized = T @ points.T
+
+    print('Distance:', np.mean([np.linalg.norm(x) for x in points_normalized.T[:, :2]]))
     
-    return points_normalized, T
+    return points_normalized.T, T
 
 
 def findFundamentalMatrixOpenCV(points1, points2):
@@ -86,6 +89,9 @@ def findFundamentalMatrixEightPointAlgo(points1, points2, normalize=False):
         points1, T1 = normalize_points(points1)
         points2, T2 = normalize_points(points2)
     
+    print('Distance of points1:', np.mean([np.linalg.norm(x) for x in points1[:, :2]]))
+    print('Distance of points2:', np.mean([np.linalg.norm(x) for x in points2[:, :2]]))
+    
     # construct the nx9 matrix A
     A = np.array([points1[:,0] * points2[:,0], 
                   points1[:,0] * points2[:,1], 
@@ -97,58 +103,55 @@ def findFundamentalMatrixEightPointAlgo(points1, points2, normalize=False):
                   points2[:,1], 
                   np.ones((len(points1)))]).T
 
-    _, _, Vt = np.linalg.svd(A)
+    _, _, VT = np.linalg.svd(A)
     # The entries of F are the components of the column of V corresponding to the smallest singular value (last value in D)
-    F = Vt.T[:,-1].reshape(3,3)
+    F = VT.T[:,-1].reshape(3,3)
 
     # Find the SVD of F
-    Uf, Df, Vft = np.linalg.svd(F)
+    Uf, Df, VfT = np.linalg.svd(F)
     # Set the smallest singular value in the diagonal matrix Df to zero
     Df[-1] = 0
     # Recompute F
-    F = Uf @ np.diag(Df) @ Vft
+    F = Uf @ np.diag(Df) @ VfT
 
     if normalize:
         F = T2.T @ F @ T1
+
     return F
 
 
-def plot_epipolar_lines(img1, img2, points, F_matrix):
+def findFundamentalMatrixEightPointAlgoRansac(points1, points2):
+    indices = [ind for ind,_ in random.sample(list(enumerate(points1)), 8)]
+    points1_8 = points1[indices]
+    points2_8 = points2[indices]
 
-    # compute epipolar lines corresponding to points in image 2
-    lines1 = points @ F_matrix
 
-    _, w, _ = img1.shape
-    # draw epipolar lines on image 1 corresponding to points in image 2
-    for i, l in enumerate(lines1):
-        color = (random.randint(128,255), random.randint(128,255), random.randint(128,255))
-        pt1 = (0, int(-l[2]/l[1]))
-        pt2 = (w, int((-l[2]-w*l[0])/l[1]))
-        img1_lines = cv.line(img1, pt1, pt2, color)
-        img2_points = cv.circle(img2, (int(points[i, 0]), int(points[i, 1])), 3, color, 1)
-
-    plt.subplot(121)
-    plt.imshow(img1_lines)
-    plt.subplot(122)
-    plt.imshow(img2_points)
-    plt.show()
-
+    
 
 if __name__ == '__main__':
     
     img1_num = 1
     img2_num = 2
-    dist_ratio = 0.2
+    dist_ratio = 0.7
+    random.seed(10)
 
-    #load images
     img1 = cv.imread(f'./Data/house/frame0000000{img1_num}.png') # queryImage
     img2 = cv.imread(f'./Data/house/frame0000000{img2_num}.png') # trainImage
+
+    counts = ["{0:02}".format(i) for i in range(1, 50)]
+
+    #load images
+    # for i in range(len(counts)-1):
+    #     img1 = cv.imread(f'./Data/house/frame000000{counts[i]}.png') # queryImage
+    #     img2 = cv.imread(f'./Data/house/frame000000{counts[i+1]}.png') # trainImage
     
     #calculate matching keypoints
     points1, points2 = calculate_keypoint_matching(img1, img2, dist_ratio)
-    F_matrix = findFundamentalMatrixOpenCV(points1, points2)
-    plot_epipolar_lines(img1.copy(), img2.copy(), points2, F_matrix)
+
+    # F_matrix = findFundamentalMatrixOpenCV(points1, points2)
+    # plot_epipolar_lines(img1.copy(), img2.copy(), points2, F_matrix)
     F_matrix = findFundamentalMatrixEightPointAlgo(points1.copy(), points2.copy(), normalize=True)
-    plot_epipolar_lines(img1.copy(), img2.copy(), points2, F_matrix)
+    # F_matrix = findFundamentalMatrixEightPointAlgoRansac(points1.copy(), points2.copy())
+    # plot_epipolar_lines(img1.copy(), img2.copy(), points2, F_matrix)
     # plot_epipolar_lines(img2.copy(), img1.copy(), points1, F_matrix)
 
