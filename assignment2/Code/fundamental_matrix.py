@@ -5,7 +5,7 @@ import random
 from utils import *
 
 
-def calculate_keypoint_matching(img1, img2, dist_ratio):
+def calculate_keypoint_matching(img1, img2, dist_ratio, draw=True):
     '''
     Finds the keypoints between the two images img1 and img2
     and their corresponding matches
@@ -35,9 +35,10 @@ def calculate_keypoint_matching(img1, img2, dist_ratio):
             
     
     # cv.drawMatchesKnn expects list of lists as matches.
-    img3 = cv.drawMatchesKnn(img1, kp1, img2, kp2, good, None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-    plt.imshow(img3)
-    # plt.show()
+    if draw:
+        img3 = cv.drawMatchesKnn(img1, kp1, img2, kp2, good, None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+        plt.imshow(img3)
+        plt.show()
 
     points1 = np.array(points1)
     points2 = np.array(points2)
