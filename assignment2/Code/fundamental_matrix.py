@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import random
 from utils import *
 
+
 def calculate_keypoint_matching(img1, img2, dist_ratio):
     '''
     Finds the keypoints between the two images img1 and img2
@@ -65,7 +66,7 @@ def normalize_points(points):
 
     points_normalized = T @ points.T
 
-    print('Distance:', np.mean([np.linalg.norm(x) for x in points_normalized.T[:, :2]]))
+    # print('Distance:', np.mean([np.linalg.norm(x) for x in points_normalized.T[:, :2]]))
     
     return points_normalized.T, T
 
@@ -89,8 +90,8 @@ def findFundamentalMatrixEightPointAlgo(points1, points2, normalize=False):
         points1, T1 = normalize_points(points1)
         points2, T2 = normalize_points(points2)
     
-    print('Distance of points1:', np.mean([np.linalg.norm(x) for x in points1[:, :2]]))
-    print('Distance of points2:', np.mean([np.linalg.norm(x) for x in points2[:, :2]]))
+    # print('Distance of points1:', np.mean([np.linalg.norm(x) for x in points1[:, :2]]))
+    # print('Distance of points2:', np.mean([np.linalg.norm(x) for x in points2[:, :2]]))
     
     # construct the nx9 matrix A
     A = np.array([points1[:,0] * points2[:,0], 
@@ -117,15 +118,44 @@ def findFundamentalMatrixEightPointAlgo(points1, points2, normalize=False):
     if normalize:
         F = T2.T @ F @ T1
 
+    # print(np.mean(A @ F.reshape(9,1)))
+
     return F
 
 
-def findFundamentalMatrixEightPointAlgoRansac(points1, points2):
-    indices = [ind for ind,_ in random.sample(list(enumerate(points1)), 8)]
-    points1_8 = points1[indices]
-    points2_8 = points2[indices]
+def find_inliers(F, points1, points2, sampson_thres=1):
+    points1_inliers = []
+    points2_inliers = []
+    for i in range(len(points1)):
+        d = (points1[i].T @ F @ points2[i]) ** 2 / ((F @ points1[i])[0] ** 2 + (F @ points1[i])[1] ** 2 + (F @ points2[i])[0] ** 2 + (F @ points2[i])[1] ** 2)
+        if d < sampson_thres:
+            points1_inliers.append(points1[i])
+            points2_inliers.append(points2[i])
+
+    return np.array(points1_inliers), np.array(points2_inliers)
 
 
+def findFundamentalMatrixRansac(points1, points2, num_iterations):
+
+    max_inliers = 0
+    max_points1_inliers = []
+    max_points2_inliers = []
+    for i in range(num_iterations):
+        indices = [ind for ind,_ in random.sample(list(enumerate(points1)), 8)]
+        points1_8 = points1[indices]
+        points2_8 = points2[indices]
+
+        F_matrix = findFundamentalMatrixEightPointAlgo(points1_8, points2_8, normalize=True)
+        points1_inliers, points2_inliers = find_inliers(F_matrix, points1, points2)
+        assert len(points1_inliers) == len(points2_inliers)
+
+        if len(points1_inliers) > max_inliers:
+            max_inliers = len(points1_inliers)
+            max_points1_inliers = points1_inliers
+            max_points2_inliers = points2_inliers
+
+    F_matrix = findFundamentalMatrixEightPointAlgo(max_points1_inliers, max_points2_inliers)
+    return F_matrix, max_inliers
     
 
 if __name__ == '__main__':
@@ -150,8 +180,10 @@ if __name__ == '__main__':
 
     # F_matrix = findFundamentalMatrixOpenCV(points1, points2)
     # plot_epipolar_lines(img1.copy(), img2.copy(), points2, F_matrix)
-    F_matrix = findFundamentalMatrixEightPointAlgo(points1.copy(), points2.copy(), normalize=True)
+    # F_matrix = findFundamentalMatrixEightPointAlgo(points1.copy(), points2.copy(), normalize=True)
+    F_matrix, max_inliers = findFundamentalMatrixRansac(points1.copy(), points2.copy(), num_iterations=200)
+    print(max_inliers)
     # F_matrix = findFundamentalMatrixEightPointAlgoRansac(points1.copy(), points2.copy())
-    # plot_epipolar_lines(img1.copy(), img2.copy(), points2, F_matrix)
+    plot_epipolar_lines(img1.copy(), img2.copy(), points2, F_matrix)
     # plot_epipolar_lines(img2.copy(), img1.copy(), points1, F_matrix)
 
