@@ -128,6 +128,7 @@ def find_inliers(F, points1, points2, sampson_thres=1):
     points1_inliers = []
     points2_inliers = []
     for i in range(len(points1)):
+        #compute sampson distance
         d = (points1[i].T @ F @ points2[i]) ** 2 / ((F @ points1[i])[0] ** 2 + (F @ points1[i])[1] ** 2 + (F @ points2[i])[0] ** 2 + (F @ points2[i])[1] ** 2)
         if d < sampson_thres:
             points1_inliers.append(points1[i])
