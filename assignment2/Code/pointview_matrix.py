@@ -73,21 +73,24 @@ def create_pv_matrix(start=1, N=50, dist_ratio=0.2):
 
     points1, points2 = calculate_keypoint_matching(img1, img2, dist_ratio, draw=False)
 
-    pv_mtx.append(points1[:, 0])
-    pv_mtx.append(points1[:, 1])
+    # pv_mtx.append(points1[:, 0])
+    # pv_mtx.append(points1[:, 1])
     pv_mtx.append(points2[:, 0])
     pv_mtx.append(points2[:, 1])
 
-    for i in range(start + 1, N - 1):
+    for i in range(start + 1, N):
         img1 = cv.imread(f'./Data/house/frame000000{"{0:02}".format(i)}.png')
-        img2 = cv.imread(f'./Data/house/frame000000{"{0:02}".format(i+1)}.png')
+        if i == N-1:
+            img2 = cv.imread(f'./Data/house/frame000000{"{0:02}".format(start)}.png')
+        else:
+            img2 = cv.imread(f'./Data/house/frame000000{"{0:02}".format(i+1)}.png')
 
         # Keypoint matching
         points1, points2 = calculate_keypoint_matching(img1, img2, dist_ratio, draw=False)
 
         # Obtain the row with the already obtained matches.
-        cur_x = pv_mtx[2*(i-1)]
-        cur_y = pv_mtx[2*(i-1) + 1]
+        cur_x = pv_mtx[2*(i-2)]
+        cur_y = pv_mtx[2*(i-2) + 1]
 
         # Obtain the rows of the new matches.
         X1 = points1[:, 0]
