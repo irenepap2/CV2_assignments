@@ -62,7 +62,7 @@ def update_columns(pv_mtx, new_cols):
     return new_pv_mtx
 
 
-def create_pv_matrix(start=1, N=50, dist_ratio=0.2):
+def create_pv_matrix(start=1, N=50, dist_ratio=0.7):
     '''
     Create Point-view matrix with images start to N.
     '''
@@ -84,9 +84,11 @@ def create_pv_matrix(start=1, N=50, dist_ratio=0.2):
             img2 = cv.imread(f'./Data/house/frame000000{"{0:02}".format(start)}.png')
         else:
             img2 = cv.imread(f'./Data/house/frame000000{"{0:02}".format(i+1)}.png')
-
+        
         # Keypoint matching
         points1, points2 = calculate_keypoint_matching(img1, img2, dist_ratio, draw=False)
+        if len(points1) == 0:
+            continue
 
         # Obtain the row with the already obtained matches.
         cur_x = pv_mtx[2*(i-2)]
@@ -115,16 +117,15 @@ def create_pv_matrix(start=1, N=50, dist_ratio=0.2):
 def visualize_pvm(pvm):
     pvm[pvm!=-1] = 0
     pvm[pvm==-1] = 1
-    plt.imshow(pvm, cmap='gray')
+    plt.imshow(pvm, cmap='gray', aspect=20)
     plt.show()
 
 
 if __name__ == '__main__':
 
-    # pvm = np.loadtxt('PVM_ours.txt')
+    # pvm = np.loadtxt('PVM_ours_last.txt')
+    # pvm = np.loadtxt('PointViewMatrix.txt')
     pvm = create_pv_matrix()
+    # np.savetxt('PVM_ours_last.txt', pvm)
     print(pvm.shape)
     visualize_pvm(pvm.copy())
-    # mtx2 = shared_points(mtx)
-    # print(mtx2.shape)
-    # print(mtx2)

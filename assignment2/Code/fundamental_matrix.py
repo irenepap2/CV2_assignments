@@ -5,13 +5,14 @@ import random
 from utils import *
 
 
-def calculate_keypoint_matching(img1, img2, dist_ratio, draw=True):
+def calculate_keypoint_matching(img1, img2, dist_ratio=0.7, draw=True):
     '''
     Finds the keypoints between the two images img1 and img2
     and their corresponding matches
     SIFT descriptors to find the keypoints
     BFMatcher to match descriptors
     '''
+
     img1 = cv.cvtColor(img1, cv.COLOR_BGR2GRAY)
     img2 = cv.cvtColor(img2, cv.COLOR_BGR2GRAY)
 
@@ -30,22 +31,25 @@ def calculate_keypoint_matching(img1, img2, dist_ratio, draw=True):
     for m, n in matches:
         if m.distance < dist_ratio*n.distance:
             good.append([m])
-            points1.append(kp1[m.queryIdx].pt) #append kp1 coordinates (index of the descriptor in query descriptors)
-            points2.append(kp2[m.trainIdx].pt) #append kp2 coordinates (index of the descriptor in train descriptors)
+            x1, y1 = kp1[m.queryIdx].pt
+            x2, y2 = kp2[m.trainIdx].pt
+            # make sure that the matches are not outliers
+            if (x1 - x2) ** 2 + (y1 - y2) ** 2 < 3 ** 2:
+                points1.append(kp1[m.queryIdx].pt) #append kp1 coordinates (index of the descriptor in query descriptors)
+                points2.append(kp2[m.trainIdx].pt) #append kp2 coordinates (index of the descriptor in train descriptors)
             
-    
-    # cv.drawMatchesKnn expects list of lists as matches.
     if draw:
+        # cv.drawMatchesKnn expects list of lists as matches.
         img3 = cv.drawMatchesKnn(img1, kp1, img2, kp2, good, None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
         plt.imshow(img3)
         plt.show()
 
-    points1 = np.array(points1)
-    points2 = np.array(points2)
-
-    # convert points to homogeneous coordinates
-    points1 = np.concatenate((points1, np.ones((len(points1),1))), axis=1)
-    points2 = np.concatenate((points2, np.ones((len(points2),1))), axis=1)
+    if len(points1) != 0:
+        points1 = np.array(points1)
+        points2 = np.array(points2)
+        # convert points to homogeneous coordinates
+        points1 = np.concatenate((points1, np.ones((len(points1),1))), axis=1)
+        points2 = np.concatenate((points2, np.ones((len(points2),1))), axis=1)
     
     return points1, points2
 
@@ -91,8 +95,8 @@ def findFundamentalMatrixEightPointAlgo(points1, points2, normalize=False):
         points1, T1 = normalize_points(points1)
         points2, T2 = normalize_points(points2)
     
-    # print('Distance of points1:', np.mean([np.linalg.norm(x) for x in points1[:, :2]]))
-    # print('Distance of points2:', np.mean([np.linalg.norm(x) for x in points2[:, :2]]))
+    print('Distance of points1:', np.mean([np.linalg.norm(x) for x in points1[:, :2]]))
+    print('Distance of points2:', np.mean([np.linalg.norm(x) for x in points2[:, :2]]))
     
     # construct the nx9 matrix A
     A = np.array([points1[:,0] * points2[:,0], 
@@ -119,12 +123,13 @@ def findFundamentalMatrixEightPointAlgo(points1, points2, normalize=False):
     if normalize:
         F = T2.T @ F @ T1
 
-    # print(np.mean(A @ F.reshape(9,1)))
+    # Epipolar Constaint
+    print('Epipolar constrain:', np.mean(A @ F.reshape(9,1)))
 
     return F
 
 
-def find_inliers(F, points1, points2, sampson_thres=1):
+def find_inliers(F, points1, points2, sampson_thres=0.3):
     points1_inliers = []
     points2_inliers = []
     for i in range(len(points1)):
@@ -156,7 +161,7 @@ def findFundamentalMatrixRansac(points1, points2, num_iterations):
             max_points1_inliers = points1_inliers
             max_points2_inliers = points2_inliers
 
-    F_matrix = findFundamentalMatrixEightPointAlgo(max_points1_inliers, max_points2_inliers)
+    F_matrix = findFundamentalMatrixEightPointAlgo(max_points1_inliers, max_points2_inliers, normalize=True)
     return F_matrix, max_inliers
     
 
@@ -178,14 +183,16 @@ if __name__ == '__main__':
     #     img2 = cv.imread(f'./Data/house/frame000000{counts[i+1]}.png') # trainImage
     
     #calculate matching keypoints
-    points1, points2 = calculate_keypoint_matching(img1, img2, dist_ratio)
+    points1, points2 = calculate_keypoint_matching(img1, img2, dist_ratio, draw=True)
+    print(len(points1))
 
     # F_matrix = findFundamentalMatrixOpenCV(points1, points2)
-    # plot_epipolar_lines(img1.copy(), img2.copy(), points2, F_matrix)
-    # F_matrix = findFundamentalMatrixEightPointAlgo(points1.copy(), points2.copy(), normalize=True)
-    F_matrix, max_inliers = findFundamentalMatrixRansac(points1.copy(), points2.copy(), num_iterations=200)
-    print(max_inliers)
-    # F_matrix = findFundamentalMatrixEightPointAlgoRansac(points1.copy(), points2.copy())
-    plot_epipolar_lines(img1.copy(), img2.copy(), points2, F_matrix)
-    # plot_epipolar_lines(img2.copy(), img1.copy(), points1, F_matrix)
-
+    F_matrix = findFundamentalMatrixEightPointAlgo(points1.copy(), points2.copy(), normalize=False)
+    # F_matrix, max_inliers = findFundamentalMatrixRansac(points1.copy(), points2.copy(), num_iterations=300)
+    # print('Max inliers:', max_inliers)
+    
+    plot_epipolar_lines(img1.copy(), img2.copy(), points1[:10], points2[:10], F_matrix)
+    
+    # lines1 = cv.computeCorrespondEpilines(points2.reshape(-1,1,2), 2, F_matrix)
+    # lines1 = lines1.reshape(-1,3)
+    # img5,img6 = drawlines(img1, img2, lines1, points1, points2)
