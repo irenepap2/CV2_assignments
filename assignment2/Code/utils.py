@@ -4,7 +4,11 @@ import cv2 as cv
 import numpy as np
 from scipy.linalg import orthogonal_procrustes
 
+
 def plot_epipolar_lines(img1, img2, points1, points2, F_matrix):
+    '''
+    TODO: Docstring
+    '''
 
     # compute epipolar lines corresponding to points in image 2
     lines1 = points2 @ F_matrix
@@ -15,17 +19,19 @@ def plot_epipolar_lines(img1, img2, points1, points2, F_matrix):
     _, w, _ = img1.shape
     # draw epipolar lines on image 1 corresponding to points in image 2
     for i, l in enumerate(lines1):
-        color = (random.randint(128,255), random.randint(128,255), random.randint(128,255))
-        pt1 = (0, int(-l[2]/l[1]))
-        pt2 = (w, int((-l[2]-w*l[0])/l[1]))
+        color = (random.randint(128, 255), random.randint(128, 255),
+                 random.randint(128, 255))
+        pt1 = (0, int(-l[2] / l[1]))
+        pt2 = (w, int((-l[2] - w*l[0]) / l[1]))
         img1 = cv.line(img1, pt1, pt2, color)
         img2 = cv.circle(img2, (int(points2[i, 0]), int(points2[i, 1])), 3, color, 3)
 
     # # draw epipolar lines on image 2 corresponding to points in image 1
     for i, l in enumerate(lines2):
-        color = (random.randint(128,255), random.randint(128,255), random.randint(128,255))
-        pt1 = (0, int(-l[2]/l[1]))
-        pt2 = (w, int((-l[2]-w*l[0])/l[1]))
+        color = (random.randint(128, 255), random.randint(128, 255),
+                 random.randint(128, 255))
+        pt1 = (0, int(-l[2] / l[1]))
+        pt2 = (w, int((-l[2] - w*l[0]) / l[1]))
         img2 = cv.line(img2, pt1, pt2, color)
         img1 = cv.circle(img1, (int(points1[i, 0]), int(points1[i, 1])), 3, color, 3)
 
@@ -36,25 +42,18 @@ def plot_epipolar_lines(img1, img2, points1, points2, F_matrix):
     plt.show()
 
 
-def drawlines(img1,img2,lines,pts1,pts2):
-
-    ''' img1 - image on which we draw the epilines for the points in img2
-        lines - corresponding epilines '''
-
-    r,c = img1.shape
-    img1 = cv.cvtColor(img1,cv.COLOR_GRAY2BGR)
-    img2 = cv.cvtColor(img2,cv.COLOR_GRAY2BGR)
-    for r,pt1,pt2 in zip(lines,pts1,pts2):
-        color = tuple(np.random.randint(0,255,3).tolist())
-        x0,y0 = map(int, [0, -r[2]/r[1] ])
-        x1,y1 = map(int, [c, -(r[2]+r[0]*c)/r[1] ])
-        img1 = cv.line(img1, (x0,y0), (x1,y1), color,1)
-        img1 = cv.circle(img1,tuple(pt1),5,color,-1)
-        img2 = cv.circle(img2,tuple(pt2),5,color,-1)
-    return img1,img2
-
-
 def procrustes(data1, data2):
+    '''****************************************
+    *   NOT OUR CODE, MODIFIED VERSION OF:
+    *
+    *   Title: scipy.spatial._procrustes.py
+    *   Author: Scipy
+    *   Date: 13/05/2022
+    *   Code version: March 08 2020 Commit
+    *   Availability:
+    * https://github.com/scipy/scipy/blob/v1.8.0/scipy/spatial/_procrustes.py
+    *
+    ****************************************'''
     mtx1 = np.array(data1, dtype=np.double, copy=True)
     mtx2 = np.array(data2, dtype=np.double, copy=True)
 
@@ -85,5 +84,5 @@ def procrustes(data1, data2):
 
     # measure the dissimilarity between the two datasets
     disparity = np.sum(np.square(mtx1 - mtx2))
-    
+
     return mtx1, mtx2, disparity, R, s, norm1, norm2
