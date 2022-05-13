@@ -61,28 +61,44 @@ def visualize(S):
     o3d.visualization.draw_geometries([pcd])
 
 
-def factorize_and_stich(structs, index_list):
+def factorize_and_stich(structs, index_list, inters=True):
 
     merged_cloud = []
     N = len(structs)
 
     for i in range(N-1):
         # find the index intersection of the two structures
-        indx_intersection = np.intersect1d(index_list[i], index_list[i + 1])
+        if inters:
+            indx_intersection = np.intersect1d(index_list[i], index_list[i + 1])
 
-        # keep only the indices that are in the intersection
-        indx1 = [int(np.where(index_list[i] == x)[0]) for x in indx_intersection]
-        indx2 = [int(np.where(index_list[i + 1] == x)[0]) for x in indx_intersection]
+            # keep only the indices that are in the intersection
+            indx1 = [int(np.where(index_list[i] == x)[0]) for x in indx_intersection]
+            indx2 = [int(np.where(index_list[i + 1] == x)[0]) for x in indx_intersection]
 
-        s1 = structs[i][:, indx1]       
-        s2 = structs[i + 1][:, indx2]
+            s1 = structs[i][:, indx1]
+            s2 = structs[i + 1][:, indx2]
+            s1_new = s1
+            s2_new = s2
+        else:
+            s1 = structs[i]
+            s2 = structs[i+1]
+
+            if len(s1[0]) > len(s2[0]):
+                s1_new = s1
+                s2_new = np.hstack((s2, np.zeros((3, len(s1[0]) - len(s2[0])))))
+            elif len(s1[0]) < len(s2[0]):
+                s1_new = np.hstack((s1, np.zeros((3, len(s2[0]) - len(s1[0])))))
+                s2_new = s2
+            else:
+                s1_new = s1
+                s2_new = s2
 
         if i == 0:
-            _, _, _, R, s, norm1, norm2 = procrustes(s1.T, s2.T)
+            _, _, _, R, s, norm1, norm2 = procrustes(s1_new.T, s2_new.T)
             trans = (s2.T - np.mean(s2.T, axis=0)) @ R.T * s
             merged_cloud = np.vstack((trans/norm1, structs[i + 1].T/norm2))
         else:
-            _, _, _, R, s, norm1, norm2 = procrustes(s1.T, s2.T)
+            _, _, _, R, s, norm1, norm2 = procrustes(s1_new.T, s2_new.T)
             merged_cloud = (merged_cloud - np.mean(merged_cloud, axis=0)) @ R.T * s
             merged_cloud = np.vstack((merged_cloud/norm1, structs[i + 1].T/norm2))
 
