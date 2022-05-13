@@ -1,7 +1,8 @@
 from fundamental_matrix import *
 import cv2 as cv
 import numpy as np
-from scipy import spatial
+import matplotlib.pyplot as plt
+import time
 
 
 def shared_points(mtx):
@@ -33,17 +34,23 @@ def improve_density(cur_x, cur_y, dist_ratio, pv_mtx, start=1, index=2):
             X2 = points2[:, 0]
             Y2 = points2[:, 1]
 
-            # Add the new points if they exist
+            # Add the new points if they exist.
             for j in range(len(X1)):
+
                 for m in range(len(m_x)):
+
                     if m_x[m] == X1[j] and m_y[m] == Y1[j]:
+
                         if cur_x[m] == -1:
                             add_p = True
+
                             for x, y in zip(cur_x, cur_y):
                                 # If a point has already been added, dont add it again
                                 if x == X2[j] and y == Y2[j]:
                                     add_p = False
                                     break
+
+                            # Add point to row.
                             if add_p:
                                 cur_x[m] = X2[j]
                                 cur_y[m] = Y2[j]
@@ -85,6 +92,7 @@ def construct_new_pv_row(X1, Y1, X2, Y2, cur_x, cur_y, dist_ratio, pv_mtx, start
             cur_x = np.insert(cur_x, arr_len, X1[j])
             cur_y = np.insert(cur_y, arr_len, Y1[j])
 
+    # Increase density of PVM.
     if improv:
         cur_x, cur_y = improve_density(cur_x, cur_y, dist_ratio, pv_mtx, start, index)
 
@@ -98,6 +106,8 @@ def update_columns(pv_mtx, new_cols):
     '''
     zeroes = np.full(new_cols, -1.0)
     new_pv_mtx = []
+
+    # Add zero values to row and insert into new PVM.
     for row in pv_mtx:
         new_row = np.append(row, zeroes)
         new_pv_mtx.append(new_row)
@@ -114,10 +124,8 @@ def create_pv_matrix(start=1, N=50, dist_ratio=0.7, improv=False):
     img1 = cv.imread(f'./Data/house/frame000000{"{0:02}".format(start)}.png')
     img2 = cv.imread(f'./Data/house/frame000000{"{0:02}".format(start+1)}.png')
 
-    points1, points2 = calculate_keypoint_matching(img1, img2, dist_ratio, draw=False)
+    _, points2 = calculate_keypoint_matching(img1, img2, dist_ratio, draw=False)
 
-    # pv_mtx.append(points1[:, 0])
-    # pv_mtx.append(points1[:, 1])
     pv_mtx.append(points2[:, 0])
     pv_mtx.append(points2[:, 1])
 
@@ -158,8 +166,11 @@ def create_pv_matrix(start=1, N=50, dist_ratio=0.7, improv=False):
 
 
 def visualize_pvm(pvm):
-    pvm[pvm!=-1] = 0
-    pvm[pvm==-1] = 1
+    '''
+    Visualize the PVM.
+    '''
+    pvm[pvm != -1] = 0
+    pvm[pvm == -1] = 1
     plt.ylabel('Frames (2N)')
     plt.xlabel('Points')
     plt.imshow(pvm, cmap='gray', aspect=20)
@@ -167,8 +178,14 @@ def visualize_pvm(pvm):
 
 
 def test_methods(N=5):
+    '''
+    Compare execution time of normal and denser PVM executions.
+    '''
+
     pvm_normal = []
     pvm_improv = []
+
+    # Time the execution.
     for i in range(N):
         time1 = time.time()
         _ = create_pv_matrix(improv=False)
@@ -176,6 +193,8 @@ def test_methods(N=5):
         time1 = time.time()
         _ = create_pv_matrix(improv=True)
         pvm_improv.append(time.time() - time1)
+
+    # Print results.
     print("Normal method")
     print("Mean:", np.mean(pvm_normal))
     print("STD:", np.std(pvm_normal))
@@ -185,6 +204,13 @@ def test_methods(N=5):
 
 
 if __name__ == '__main__':
+    '''
+    test_methods():                 Run time cost experiments
+    create_pv_matrix(improv=False): Create normal PVM
+    create_pv_matrix(improv=True):  Create dense PVM
+    visualize_pvm(pvm):             Plot the PVM
+    shared_points(pvm):             obtain points in all PVM rows
+    '''
     # test_methods()
     # pvm = create_pv_matrix(improv=True)
     pvm = create_pv_matrix(improv=False)
