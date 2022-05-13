@@ -7,7 +7,7 @@ from scipy.linalg import orthogonal_procrustes
 
 def plot_epipolar_lines(img1, img2, points1, points2, F_matrix):
     '''
-    TODO: Docstring
+    Plot the epipolar lines between 2 images.
     '''
 
     # compute epipolar lines corresponding to points in image 2
