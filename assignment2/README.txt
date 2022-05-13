@@ -22,7 +22,8 @@ To obtain the blocks, run compute_structures(pvm) with the loaded pvm. Different
 using the np.loadtxt(FILENAME) function. compute_structures(pvm) contains 2 other options, the argument frame_step can be
 given to change the frame steps from 3 to whatever number required. Aside from this the argument one_block can be set to true
 to simply return the first block found. Using the function visualize(pvm.T) you can visualize the found point cloud, although
-scaling on the z axis might be necessary.
+scaling on the z axis might be necessary. The factorize_and_stich() function allows for inters to be set to False, if done so,
+0 padding will be used instead of using the intersections.
 
 //////////// Data/house FILES INCLUDED ///////////////////////
 
