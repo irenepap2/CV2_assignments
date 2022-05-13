@@ -25,7 +25,7 @@ def find_structure_motion(block):
     return S
 
 
-def compute_structures(pvm, frame_step=3):
+def compute_structures(pvm, frame_step=3, one_block=False):
     structures, idxs = [], []
 
     for i in range(0, len(pvm)-frame_step*2, 2):
@@ -49,6 +49,8 @@ def compute_structures(pvm, frame_step=3):
 
         S = find_structure_motion(block)
         structures.append(S)
+        if one_block:
+            return S
 
     return structures, idxs
 
@@ -76,11 +78,11 @@ def factorize_and_stich(structs, index_list):
         s2 = structs[i + 1][:, indx2]
 
         if i == 0:
-            _, _, _, R, s, norm2, norm1 = procrustes(s1.T, s2.T)
+            _, _, _, R, s, norm1, norm2 = procrustes(s1.T, s2.T)
             trans = (s2.T - np.mean(s2.T, axis=0)) @ R.T * s
             merged_cloud = np.vstack((trans/norm1, structs[i + 1].T/norm2))
         else:
-            _, _, _, R, s, norm2, norm1 = procrustes(s1.T, s2.T)
+            _, _, _, R, s, norm1, norm2 = procrustes(s1.T, s2.T)
             merged_cloud = (merged_cloud - np.mean(merged_cloud, axis=0)) @ R.T * s
             merged_cloud = np.vstack((merged_cloud/norm1, structs[i + 1].T/norm2))
 
@@ -88,12 +90,23 @@ def factorize_and_stich(structs, index_list):
 
 
 if __name__ == '__main__':
+
     pvm = np.loadtxt('PVM_ours_last.txt')
     # pvm = np.loadtxt('PointViewMatrix.txt')
 
     # Change frame_step to set how many consecutive frames
-    structs, index_list = compute_structures(pvm, frame_step=3)
-    merged_pcd = factorize_and_stich(structs, index_list)
-    #scale z axis for better visualization
-    merged_pcd[:, 2] = merged_pcd[:, 2] * 5
-    visualize(merged_pcd.T)
+    # structs, index_list = compute_structures(pvm, frame_step=4)
+    # merged_pcd = factorize_and_stich(structs, index_list)
+    # scale z axis for better visualization
+    # merged_pcd[:, 2] = merged_pcd[:, 2] * 5
+    # visualize(merged_pcd.T)
+
+    # visualize one block
+    S = compute_structures(pvm, frame_step=3, one_block=True).T
+    visualize(S.T)
+
+    #visualize their PointViewMatrix.txt
+    pvm = np.loadtxt('PointViewMatrix.txt')
+    pvm = pvm - np.expand_dims(np.mean(pvm, axis=1), axis=1)
+    S = find_structure_motion(pvm)
+    visualize(S)
