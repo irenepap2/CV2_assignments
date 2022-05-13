@@ -166,15 +166,28 @@ def visualize_pvm(pvm):
     plt.show()
 
 
-if __name__ == '__main__':
+def test_methods(N=5):
+    pvm_normal = []
+    pvm_improv = []
+    for i in range(N):
+        time1 = time.time()
+        _ = create_pv_matrix(improv=False)
+        pvm_normal.append(time.time() - time1)
+        time1 = time.time()
+        _ = create_pv_matrix(improv=True)
+        pvm_improv.append(time.time() - time1)
+    print("Normal method")
+    print("Mean:", np.mean(pvm_normal))
+    print("STD:", np.std(pvm_normal))
+    print("Dense method")
+    print("Mean:", np.mean(pvm_improv))
+    print("STD:", np.std(pvm_improv))
 
-    # pvm = np.loadtxt('PVM_ours.txt')
-    # pvm = np.loadtxt('PointViewMatrix.txt')
-    pvm = create_pv_matrix(improv=True)
-    # with open('PVM_ours_improv.txt', 'w') as f:
-    #     for row in pvm:
-    #         f.write(' '.join([str(item) for item in row]))
-    #         f.write('\n')
+
+if __name__ == '__main__':
+    # test_methods()
+    # pvm = create_pv_matrix(improv=True)
+    pvm = create_pv_matrix(improv=False)
     print(pvm.shape)
     visualize_pvm(pvm.copy())
     print(shared_points(pvm).shape)
