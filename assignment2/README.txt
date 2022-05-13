@@ -9,7 +9,10 @@
 
 //////////// fundamental_matrix.py ///////////////////////
 
-
+Simply run the file to obtain the fundamental matrix when using the normal EPA algorithm with a dist_ratio of 0.7 and frames 1 and 2 as input.
+To obtain F for the normalized vesrsion, set flag normalize to True in findFundamentalMatrixEightPointAlgo().
+To obtain F for the normalized vesrsion with RANSAC, uncomment findFundamentalMatrixRansac().
+You can experiment with different frames or distance ratios to get our results.
 
 //////////// pointview_matrix.py ///////////////////////
 
