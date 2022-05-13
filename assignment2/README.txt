@@ -1,4 +1,4 @@
-//////////// SupplementalCode FILES INCLUDED ///////////////////////
+//////////// Code FILES INCLUDED ///////////////////////
 
 - fundamental_matrix.py      : Find the fundamental matrix, and point matching
 - pointview_matrix.py        : Obtain and plot pointview matrix
