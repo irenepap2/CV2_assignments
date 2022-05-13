@@ -1,13 +1,16 @@
 from fundamental_matrix import *
 from pointview_matrix import *
-import cv2 as cv
 import numpy as np
-from scipy import spatial
 import open3d as o3d
 from utils import *
 
 
-def find_structure_motion(block):
+def find_structure_motion(block, w_power):
+    '''
+    Perform SVD on dense block, find structure and motion matrices.
+    '''
+
+    # Perform SVD
     U, W, VT = np.linalg.svd(block)
 
     # Take three columns, values, rows respectively.
@@ -16,8 +19,8 @@ def find_structure_motion(block):
     VT = VT[:3, :]
 
     # Calculate Motion and Structure matrices.
-    M = U @ np.sqrt(W)
-    S = np.sqrt(W) @ VT
+    M = U @ (W**(w_power))
+    S = (W**(w_power)) @ VT
 
     # Check if rank of D = M @ S is equal to 3, which it should always be.
     assert np.linalg.matrix_rank(M @ S) == 3
@@ -25,7 +28,10 @@ def find_structure_motion(block):
     return S
 
 
-def compute_structures(pvm, frame_step=3, one_block=False):
+def compute_structures(pvm, frame_step=3, one_block=False, w_power=0.5):
+    '''
+    Obtain structure blocks.
+    '''
     structures, idxs = [], []
 
     for i in range(0, len(pvm)-frame_step*2, 2):
@@ -47,8 +53,9 @@ def compute_structures(pvm, frame_step=3, one_block=False):
         # Normalise block.
         block = block - np.expand_dims(np.mean(block, axis=1), axis=1)
 
-        S = find_structure_motion(block)
+        S = find_structure_motion(block, w_power=w_power)
         structures.append(S)
+
         if one_block:
             return S
 
@@ -56,73 +63,80 @@ def compute_structures(pvm, frame_step=3, one_block=False):
 
 
 def visualize(S):
+    '''
+    Visualize pointcloud.
+    '''
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(S.T)
     o3d.visualization.draw_geometries([pcd])
 
 
-def factorize_and_stich(structs, index_list, inters=True):
-
+def factorize_and_stich(structs, index_list):
+    '''
+    Use procrustes to find transformation. Stitch each structure block
+    together and return final merged cloud.
+    '''
     merged_cloud = []
+    disparities = []
     N = len(structs)
 
     for i in range(N-1):
         # find the index intersection of the two structures
-        if inters:
-            indx_intersection = np.intersect1d(index_list[i], index_list[i + 1])
+        indx_intersection = np.intersect1d(index_list[i], index_list[i + 1])
 
-            # keep only the indices that are in the intersection
-            indx1 = [int(np.where(index_list[i] == x)[0]) for x in indx_intersection]
-            indx2 = [int(np.where(index_list[i + 1] == x)[0]) for x in indx_intersection]
+        # keep only the indices that are in the intersection
+        indx1 = [int(np.where(index_list[i] == x)[0]) for x in indx_intersection]
+        indx2 = [int(np.where(index_list[i + 1] == x)[0]) for x in indx_intersection]
 
-            s1 = structs[i][:, indx1]
-            s2 = structs[i + 1][:, indx2]
-            s1_new = s1
-            s2_new = s2
-        else:
-            s1 = structs[i]
-            s2 = structs[i+1]
-
-            if len(s1[0]) > len(s2[0]):
-                s1_new = s1
-                s2_new = np.hstack((s2, np.zeros((3, len(s1[0]) - len(s2[0])))))
-            elif len(s1[0]) < len(s2[0]):
-                s1_new = np.hstack((s1, np.zeros((3, len(s2[0]) - len(s1[0])))))
-                s2_new = s2
-            else:
-                s1_new = s1
-                s2_new = s2
+        s1 = structs[i][:, indx1]
+        s2 = structs[i + 1][:, indx2]
 
         if i == 0:
-            _, _, _, R, s, norm1, norm2 = procrustes(s1_new.T, s2_new.T)
+            _, _, disp, R, s, norm1, norm2 = procrustes(s1.T, s2.T)
             trans = (s2.T - np.mean(s2.T, axis=0)) @ R.T * s
-            merged_cloud = np.vstack((trans/norm1, structs[i + 1].T/norm2))
+            merged_cloud = np.vstack((trans / norm1, structs[i + 1].T/norm2))
         else:
-            _, _, _, R, s, norm1, norm2 = procrustes(s1_new.T, s2_new.T)
+            _, _, disp, R, s, norm1, norm2 = procrustes(s1.T, s2.T)
             merged_cloud = (merged_cloud - np.mean(merged_cloud, axis=0)) @ R.T * s
-            merged_cloud = np.vstack((merged_cloud/norm1, structs[i + 1].T/norm2))
+            merged_cloud = np.vstack((merged_cloud / norm1, structs[i + 1].T / norm2))
 
-    return merged_cloud
+        disparities.append(disp)
+
+    return merged_cloud, disparities
 
 
 if __name__ == '__main__':
 
-    pvm = np.loadtxt('PVM_ours_last.txt')
-    # pvm = np.loadtxt('PointViewMatrix.txt')
+    pvm = np.loadtxt('../PVM_ours_dense.txt')
+    # pvm = np.loadtxt('../PointViewMatrix.txt')
 
+    structs, index_list = compute_structures(pvm, frame_step=4, w_power=1)
+    merged_pcd, disparities = factorize_and_stich(structs, index_list)
+
+    # Scale z axis for better visualization.
+    merged_pcd[:, 2] = merged_pcd[:, 2] * 150
+
+    visualize(merged_pcd.T)
+
+    # # Visualize one block.
+    # S = compute_structures(pvm, frame_step=3, one_block=False).T
+    # visualize(S.T)
+
+    # # Visualize their PointViewMatrix.txt
+    # pvm = np.loadtxt('../PointViewMatrix.txt')
+    # pvm = pvm - np.expand_dims(np.mean(pvm, axis=1), axis=1)
+    # S = find_structure_motion(pvm)
+    # visualize(S)
+
+    # # Perform experiments on structure decomposition W^x.
     # Change frame_step to set how many consecutive frames
-    # structs, index_list = compute_structures(pvm, frame_step=4)
-    # merged_pcd = factorize_and_stich(structs, index_list)
-    # scale z axis for better visualization
-    # merged_pcd[:, 2] = merged_pcd[:, 2] * 5
-    # visualize(merged_pcd.T)
+    # Xs = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
+    # disps = []
+    # for x in Xs:
+    #     disps.append([])
+    #     for i in range(10):
+    #         structs, index_list = compute_structures(pvm, frame_step=4, w_power=x)
+    #         merged_pcd, disparities = factorize_and_stich(structs, index_list)
+    #         disps[-1].append(disparities)
 
-    # visualize one block
-    S = compute_structures(pvm, frame_step=3, one_block=True).T
-    visualize(S.T)
-
-    #visualize their PointViewMatrix.txt
-    pvm = np.loadtxt('PointViewMatrix.txt')
-    pvm = pvm - np.expand_dims(np.mean(pvm, axis=1), axis=1)
-    S = find_structure_motion(pvm)
-    visualize(S)
+    #     print(f"x: {x}", np.mean(disps[-1]), np.std(disps[-1]))
