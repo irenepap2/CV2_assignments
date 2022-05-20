@@ -24,6 +24,12 @@ pip-wheel-metadata/
 share/python-wheels/
 assignment1/Data
 assignment2/Data
+assignment3/cv2_2022_assignment3/gan_blender_release/data_set
+assignment3/cv2_2022_assignment3/input
+assignment3/cv2_2022_assignment3/images
+assignment3/cv2_2022_assignment3/BFM
+assignment3/cv2_2022_assignment3/annotation
+assignment3/cv2_2022_assignment3/gan_blender_release/Blender/checkpoints
 *.egg-info/
 .installed.cfg
 *.egg
