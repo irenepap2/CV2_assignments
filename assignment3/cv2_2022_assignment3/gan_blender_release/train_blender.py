@@ -17,11 +17,16 @@ from SwappedDataset import SwappedDatasetLoader
 import utils
 import img_utils
 
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
+# import wandb
 
+# wandb.init(project="FSGAN-CV2-project", entity="irenepap")
+torch.autograd.set_detect_anomaly(True)
 # Configurations
 ######################################################################
 # Fill in your experiment names and the other required components
-experiment_name = 'Blender'
+experiment_name = 'TargetDiscriminator'
 data_root = './data_set/data_set/'
 train_list = 'train.str'
 test_list = 'test.str'
@@ -81,7 +86,7 @@ print('[I] STATUS: Initiate Network and transfer to device...', end='')
 # Define your generators and Discriminators here
 discriminator = discriminators_pix2pix.MultiscaleDiscriminator()
 generator = res_unet.MultiScaleResUNet(in_nc=7)
-print(done)
+# print(done)
 
 print('[I] STATUS: Load Networks...', end='')
 # Load your pretrained models here. Pytorch requires you to define the model
@@ -93,7 +98,7 @@ discriminator, _, _ = utils.loadModels(discriminator, path=D_PATH)
 generator, _, _ = utils.loadModels(generator, path=G_PATH)
 discriminator.to(device)
 generator.to(device)
-print(done)
+# print(done)
 
 print('[I] STATUS: Initiate optimizer...', end='')
 # Define your optimizers and the schedulers and connect the networks from
@@ -102,7 +107,7 @@ optimizer_G = torch.optim.SGD(generator.parameters(), momentum=momentum, lr=lr_g
 optimizer_D = torch.optim.SGD(discriminator.parameters(), momentum=momentum, lr=lr_dis, weight_decay=weightDecay)
 scheduler_G = torch.optim.lr_scheduler.StepLR(optimizer_G, step_size=step_size, gamma=gamma)
 scheduler_D = torch.optim.lr_scheduler.StepLR(optimizer_D, step_size=step_size, gamma=gamma)
-print(done)
+# print(done)
 
 print('[I] STATUS: Initiate Criterions and transfer to device...', end='')
 # Define your criterions here and transfer to the training device. They need to
@@ -116,7 +121,7 @@ criterion_pixelwise.to(device)
 criterion_id.to(device)
 criterion_attr.to(device)
 criterion_gan.to(device)
-print(done)
+# print(done)
 
 print('[I] STATUS: Initiate Dataloaders...', end='')
 # Initialize your datasets here
@@ -125,11 +130,11 @@ trainLoader = torch.utils.data.DataLoader(dataset=trainDataset, batch_size=batch
 testDataset = SwappedDatasetLoader(test_list, data_root)
 testLoader = torch.utils.data.DataLoader(dataset=testDataset, batch_size=batch_size, shuffle=True)
 print(iter(testLoader))
-print(done)
+# print(done)
 
 print('[I] STATUS: Initiate Logs...', end='')
 trainLogger = open(logTrain, 'w')
-print(done)
+# print(done)
 
 
 def transfer_mask(img1, img2, mask):
@@ -146,7 +151,7 @@ def blend_imgs_bgr(source_img, target_img, mask):
         return target_img
 
     center = (np.min(a[1]) + np.max(a[1])) // 2, (np.min(a[0]) + np.max(a[0])) // 2
-    output = cv2.seamlessClone(source_img, target_img, mask*255, center, cv2.NORMAL_CLONE)
+    output = cv2.seamlessClone(source_img, target_img, mask, center, cv2.NORMAL_CLONE)
 
     return output
 
@@ -188,28 +193,43 @@ def Train(G, D, epoch_count, iter_count):
         with torch.no_grad():
             # For each image, push to device
             source = images['source'].to(device)
-            target = images['target'].to(device)
-            swap = images['swap'].to(device)
-            mask = images['mask'].to(device)
+            target = images['target'].to(device) #(bg)
+            swap = images['swap'].to(device)     #(sw)
+            mask = images['mask'].to(device)     #(mask)   
 
-        # Concatenate swap, target and mask to derive the final input
-        input = torch.cat((swap, target, mask), dim=1).to(device)
-        img_blend = blend_imgs(swap, target, mask).to(device)
+        # Overlaid image
+        overlaid_image = transfer_mask(source, target, mask)
+        # Ground Truth
+        img_blend = blend_imgs(overlaid_image, target, mask).to(device)
+        # Concatenate overlaid_image, target and mask to derive the final input
+        input = torch.cat((overlaid_image, target, mask), dim=1).to(device)
 
-        # Blend images
+        # Blend images (pred)
         img_blend_pred = G(input)
 
+        # # print(overlaid_image[0].permute(1,2,0).squeeze().shape)
+        # f, axarr = plt.subplots(1,6)
+        # axarr[0].imshow(source[0].permute(1,2,0))
+        # axarr[1].imshow(swap[0].permute(1,2,0))
+        # axarr[2].imshow(target[0].permute(1,2,0))
+        # axarr[3].imshow(mask[0].permute(1,2,0).squeeze(), cmap='gray')
+        # axarr[4].imshow(overlaid_image[0].permute(1,2,0).squeeze())
+        # axarr[5].imshow(img_blend[0].permute(1,2,0).squeeze())
+        # plt.show()
+        # break
+
         # Fake Detection and Loss
-        pred_fake = D(img_blend_pred)
-        loss_D_fake = criterion_gan(pred_fake, False)
+        pred_fake_detached = D(img_blend_pred.detach())
+        loss_D_fake = criterion_gan(pred_fake_detached, False)
 
         # Real Detection and Loss
-        pred_real = D(img_blend)
+        pred_real = D(target)
         loss_D_real = criterion_gan(pred_real, True)
 
         loss_D_total = (loss_D_fake + loss_D_real) * 0.5
 
         # GAN loss (Fake Passability Loss)
+        pred_fake = D(img_blend_pred)
         loss_G_GAN = criterion_gan(pred_fake, True)
 
         # Reconstruction
@@ -231,15 +251,15 @@ def Train(G, D, epoch_count, iter_count):
 
         if iter_count % displayIter == 0:
             # Write to the log file.
-            trainLogger.log('losses', pixelwise=loss_pixelwise, id=loss_id, attr=loss_attr, rec=loss_rec,
-                          g_gan=loss_G_GAN, d_gan=loss_D_total)
+            # wandb.log((dict(pixelwise=loss_pixelwise.item(), id=loss_id.item(), attr=loss_attr.item(), rec=loss_rec.item(), g_gan=loss_G_GAN.item(), d_gan=loss_D_total.item())))
+            trainLogger.write(str(dict(pixelwise=loss_pixelwise.item(), id=loss_id.item(), attr=loss_attr.item(), rec=loss_rec.item(), g_gan=loss_G_GAN.item(), d_gan=loss_D_total.item())))
 
-        # Print out the losses here. Tqdm uses that to automatically print it
-        # in front of the progress bar.
-        pbar.set_description(str(trainLogger))
+        # wandb.watch(D)
+        # wandb.watch(G)
+        # Print out the losses here. Tqdm uses that to automatically print it in front of the progress bar.
+        pbar.set_description(str(dict(pixelwise=loss_pixelwise.item(), id=loss_id.item(), attr=loss_attr.item(), rec=loss_rec.item(), g_gan=loss_G_GAN.item(), d_gan=loss_D_total.item())))
 
-    # Save output of the network at the end of each epoch. The Generator
-
+    # Save output of the network at the end of each epoch.
     t_source, t_swap, t_target, t_pred, t_blend = Test(G)
     for b in range(t_pred.shape[0]):
         total_grid_load = [t_source[b], t_swap[b], t_target[b],
@@ -256,10 +276,10 @@ def Train(G, D, epoch_count, iter_count):
                      checkpoint_pattern % ('D', epoch_count))
     tqdm.write('[!] Model Saved!')
 
-    return np.nanmean(loss_pixelwise),\
-        np.nanmean(loss_id), np.nanmean(loss_attr),\
-        np.nanmean(loss_rec), np.nanmean(loss_G_GAN),\
-        np.nanmean(loss_D_total), iter_count
+    return np.nanmean(loss_pixelwise.cpu()),\
+        np.nanmean(loss_id.cpu()), np.nanmean(loss_attr.cpu()),\
+        np.nanmean(loss_rec.cpu()), np.nanmean(loss_G_GAN.cpu()),\
+        np.nanmean(loss_D_total.cpu()), iter_count
 
 
 def Test(G):
@@ -267,19 +287,30 @@ def Test(G):
         G.eval()
         t = enumerate(testLoader)
         i, (images) = next(t)
-        print(images)
+
+        source = images['source'].to(device)
+        target = images['target'].to(device) #(bg)
+        swap = images['swap'].to(device)     #(sw)
+        mask = images['mask'].to(device)     #(mask)   
+
+        # Overlaid image
+        overlaid_image = transfer_mask(source, target, mask)
+        # Ground Truth
+        blend = blend_imgs(overlaid_image, target, mask).to(device)
 
         # Feed the network with images from test set
-        img_transfer_input = testLoader
+        img_transfer_input = torch.cat((overlaid_image, target, mask), dim=1).to(device)
 
         # Blend images
         pred = G(img_transfer_input)
-        # You want to return 4 components:
-        #     1) The source face.
+        # You want to return 5 components:
+        #     1) The source face. (fg)
         #     2) The 3D reconsturction.
-        #     3) The target face.
-        #     4) The prediction from the generator.
-        #     5) The GT Blend that the network is targettting.
+        #     3) The target face. (bg)
+        #     4) The prediction from the generator. (pred)
+        #     5) The GT Blend that the network is targettting. (sw)
+
+        return source, swap, target, pred, blend 
 
 
 iter_count = 0
@@ -299,5 +330,7 @@ for i in range(max_epochs):
     # You can also print out the losses of the network here to keep track of
     # epoch wise loss.
     loss_pixelwise, loss_id, loss_attr, loss_rec, loss_G_GAN, loss_D_total, iter_count= Train(generator, discriminator, i, iter_count)
+    # print(str(dict(pixelwise=loss_pixelwise.item(), id=loss_id.item(), attr=loss_attr.item(), rec=loss_rec.item(), g_gan=loss_G_GAN.item(), d_gan=loss_D_total.item())))
+
 
 trainLogger.close()
