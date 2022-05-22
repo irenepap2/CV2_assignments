@@ -19,9 +19,9 @@ import img_utils
 
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
-# import wandb
+import wandb
 
-# wandb.init(project="FSGAN-CV2-project", entity="irenepap")
+wandb.init(project="FSGAN-CV2-project", entity="irenepap")
 torch.autograd.set_detect_anomaly(True)
 # Configurations
 ######################################################################
@@ -257,7 +257,7 @@ def Train(G, D, epoch_count, iter_count):
 
         if iter_count % displayIter == 0:
             # Write to the log file.
-            # wandb.log((dict(pixelwise=loss_pixelwise.item(), id=loss_id.item(), attr=loss_attr.item(), rec=loss_rec.item(), g_gan=loss_G_GAN.item(), d_gan=loss_D_total.item())))
+            wandb.log((dict(pixelwise=loss_pixelwise.item(), id=loss_id.item(), attr=loss_attr.item(), rec=loss_rec.item(), g_gan=loss_G_GAN.item(), d_gan=loss_D_total.item())))
             trainLogger.write(str(dict(pixelwise=loss_pixelwise.item(), id=loss_id.item(), attr=loss_attr.item(), rec=loss_rec.item(), g_gan=loss_G_GAN.item(), d_gan=loss_D_total.item())))
 
         # wandb.watch(D)
@@ -275,6 +275,7 @@ def Train(G, D, epoch_count, iter_count):
         grid = img_utils.tensor2rgb(grid.detach())
         imageio.imwrite(visuals_loc + '/Epoch_%d_output_%d.png' %
                         (epoch_count, b), grid)
+        wandb.log(dict(images=wandb.Image(grid)))
 
     utils.saveModels(G, optimizer_G, iter_count,
                      checkpoint_pattern % ('G', epoch_count))
@@ -300,10 +301,9 @@ def Test(G):
         mask = images['mask'].to(device)     #(mask)   
 
         # Overlaid image
-        overlaid_image = transfer_mask(source, target, mask)
+        overlaid_image = transfer_mask(swap, target, mask)
         # Ground Truth
         blend = blend_imgs(overlaid_image, target, mask).to(device)
-
         # Feed the network with images from test set
         img_transfer_input = torch.cat((overlaid_image, target, mask), dim=1).to(device)
 
