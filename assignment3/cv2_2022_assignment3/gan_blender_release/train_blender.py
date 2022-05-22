@@ -198,25 +198,31 @@ def Train(G, D, epoch_count, iter_count):
             mask = images['mask'].to(device)     #(mask)   
 
         # Overlaid image
-        overlaid_image = transfer_mask(source, target, mask)
+        overlaid_image = transfer_mask(swap, target, mask)
         # Ground Truth
         img_blend = blend_imgs(overlaid_image, target, mask).to(device)
         # Concatenate overlaid_image, target and mask to derive the final input
         input = torch.cat((overlaid_image, target, mask), dim=1).to(device)
 
-        # Blend images (pred)
-        img_blend_pred = G(input)
-
-        # # print(overlaid_image[0].permute(1,2,0).squeeze().shape)
+        # print(overlaid_image[0].permute(1,2,0).squeeze().shape)
         # f, axarr = plt.subplots(1,6)
+        # axarr[0].set_title("source")
         # axarr[0].imshow(source[0].permute(1,2,0))
+        # axarr[1].set_title("swap")
         # axarr[1].imshow(swap[0].permute(1,2,0))
+        # axarr[2].set_title("target")
         # axarr[2].imshow(target[0].permute(1,2,0))
+        # axarr[3].set_title("mask")
         # axarr[3].imshow(mask[0].permute(1,2,0).squeeze(), cmap='gray')
+        # axarr[4].set_title("overlaid")
         # axarr[4].imshow(overlaid_image[0].permute(1,2,0).squeeze())
+        # axarr[5].set_title("blended (GT)")
         # axarr[5].imshow(img_blend[0].permute(1,2,0).squeeze())
         # plt.show()
         # break
+
+        # Blend images (pred)
+        img_blend_pred = G(input)
 
         # Fake Detection and Loss
         pred_fake_detached = D(img_blend_pred.detach())
@@ -276,10 +282,10 @@ def Train(G, D, epoch_count, iter_count):
                      checkpoint_pattern % ('D', epoch_count))
     tqdm.write('[!] Model Saved!')
 
-    return np.nanmean(loss_pixelwise.cpu()),\
-        np.nanmean(loss_id.cpu()), np.nanmean(loss_attr.cpu()),\
-        np.nanmean(loss_rec.cpu()), np.nanmean(loss_G_GAN.cpu()),\
-        np.nanmean(loss_D_total.cpu()), iter_count
+    return np.nanmean(loss_pixelwise.cpu().detach().numpy()),\
+        np.nanmean(loss_id.cpu().detach().numpy()), np.nanmean(loss_attr.cpu().detach().numpy()),\
+        np.nanmean(loss_rec.cpu().detach().numpy()), np.nanmean(loss_G_GAN.cpu().detach().numpy()),\
+        np.nanmean(loss_D_total.cpu().detach().numpy()), iter_count
 
 
 def Test(G):
