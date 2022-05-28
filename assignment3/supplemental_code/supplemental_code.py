@@ -1,6 +1,6 @@
 import sys
 import os
-# import dlib
+import dlib
 import glob
 import numpy as np
 
@@ -17,10 +17,11 @@ def shape_to_np(shape, dtype="int"):
     # return the list of (x, y)-coordinates
     return coords
 
-
 def detect_landmark(img):
     detector = dlib.get_frontal_face_detector()
     predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
+    # win = dlib.image_window()
+    # win.set_image(img)
 
     # Ask the detector to find the bounding boxes of each face. The 1 in the
     # second argument indicates that we should upsample the image 1 time. This
@@ -32,6 +33,8 @@ def detect_landmark(img):
         #     k, d.left(), d.top(), d.right(), d.bottom()))
         # Get the landmarks/parts for the face in box d.
         shape = predictor(img, d)
+        # win.add_overlay(shape)
+        # dlib.hit_enter_to_continue()
         # Draw the face landmarks on the screen.
         return shape_to_np(shape)
 
