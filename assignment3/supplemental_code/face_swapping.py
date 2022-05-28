@@ -63,7 +63,7 @@ def get_landmarks(G_3D, plot=False):
         return landmarks
 
 
-def pinhole(G, Rots, t):
+def pinhole(G, Rots, t, h, w, fov=0.5):
 
     Rx, Ry, Rz = Rots
     Rx, Ry, Rz = math.radians(Rx), math.radians(Ry), math.radians(Rz)
@@ -77,33 +77,33 @@ def pinhole(G, Rots, t):
                     [np.sin(Rz), np.cos(Rz), 0],
                     [0, 0, 1]])
 
-    # Rotz = torch.from_numpy(Rotz)
     R = (torch.from_numpy(Rotx) @ torch.from_numpy(Roty) @ torch.from_numpy(Rotz)).float()
 
     bfm = h5py.File("model2017-1_face12_nomouth.h5", 'r')
     color = np.asarray(bfm['color/model/mean'], dtype=np.float32)
     color = np.reshape(color, (color.shape[0] // 3, 3))
 
-    shape_rep = np.asarray(bfm['shape/representer/cells'], dtype=np.int32).T
+    G = G @ R.T + t
 
-    G_R = G @ R.T + t
-
+    # shape_rep = np.asarray(bfm['shape/representer/cells'], dtype=np.int32).T
     # save_obj("morphable_rot.obj", G_R, color, shape_rep)
 
     #convert to homogeneous coordinates
-    G_ = torch.cat((G_R, torch.ones(G.shape[0],1)), dim=1)
+    G_ = torch.cat((G, torch.ones(G.shape[0],1)), dim=1)
 
     # Find ranges
-    G_n = G.detach().numpy()
-    vl, vr = np.min(G_n[:, 0]), np.max(G_n[:, 0])
-    vb, vt = np.min(G_n[:, 1]), np.max(G_n[:, 1])
-    vn, vf = np.min(G_n[:, 2]), np.max(G_n[:, 2])
+    aspect_ratio = w/h
+    vn = 600
+    vf = 1000
+    vt = np.tan(fov/2) * vn
+    vb = - vt
+    vr = vt * aspect_ratio
+    vl = -vt * aspect_ratio
     
     V = np.array([[(vr-vl)/2, 0, 0, (vr+vl)/2],
                   [0, (vt-vb)/2, 0, (vt+vb)/2],
                   [0, 0, 1/2, 1/2],
                   [0, 0, 0, 1]])
-
 
     P = np.array([[2*vn/(vr-vl), 0, (vr+vl)/(vr-vl), 0],
                  [0, 2*vn/(vt-vb), (vt+vb)/(vt-vb), 0],
@@ -112,7 +112,7 @@ def pinhole(G, Rots, t):
 
     Pi = torch.from_numpy(V @ P).float()
 
-    G_3D = (G_ @ Pi)
+    G_3D = (G_ @ Pi.T)
 
     # Dividing by homogenous coordinate.
     G_3D = (G_3D / G_3D[:, 3][:, None])
@@ -123,18 +123,23 @@ def pinhole(G, Rots, t):
 if __name__ == '__main__':
     bfm = h5py.File('model2017-1_face12_nomouth.h5', 'r')
 
-    rots = torch.FloatTensor([0, 0, 0])
+    rots = torch.FloatTensor([0, 0, 180])
     t = torch.FloatTensor([0, 0, -500])
 
     G, color, shape_rep = find_g(bfm)
 
-    G1 = pinhole(G, rots, t)
-    pred_landmarks = get_landmarks(G1, plot=False)
-
     img = cv2.imread('beyonce.jpg')[:,:,::-1]
+    h, w, _ = img.shape
     gt_landmarks = detect_landmark(img)
+    gt_landmarks[:,0] = gt_landmarks[:,0] - w/2
+    gt_landmarks[:,1] = gt_landmarks[:,1] - h/2
+    
+    G_2D = pinhole(G, rots, t, h, w)
+    pred_landmarks = get_landmarks(G_2D, plot=False)
+    # pred_landmarks = np.loadtxt("Landmarks68_model2017-1_face12_nomouth.anl").astype(int)
+    # pred_landmarks = G1[pred_landmarks]
 
     plt.scatter(pred_landmarks[:,0], pred_landmarks[:,1], color='red', label='prediction')
-    # plt.scatter(gt_landmarks[:,0], gt_landmarks[:,1], color='blue', label='ground truth')
+    plt.scatter(gt_landmarks[:,0], gt_landmarks[:,1], color='blue', label='ground truth')
     plt.legend()
     plt.show()
