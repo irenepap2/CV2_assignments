@@ -30,6 +30,8 @@ assignment3/cv2_2022_assignment3/images
 assignment3/cv2_2022_assignment3/BFM
 assignment3/cv2_2022_assignment3/annotation
 assignment3/cv2_2022_assignment3/gan_blender_release/Blender/checkpoints
+assignment3/cv2_2022_assignment3/gan_blender_release/wandb
+assignment3/cv2_2022_assignment3/gan_blender_release/sites
 *.egg-info/
 .installed.cfg
 *.egg

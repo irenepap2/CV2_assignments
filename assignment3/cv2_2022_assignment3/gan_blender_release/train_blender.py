@@ -21,17 +21,17 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import wandb
 
-wandb.init(project="FSGAN-CV2-project", entity="irenepap")
+# wandb.init(project="FSGAN-CV2-project", entity="irenepap")
 torch.autograd.set_detect_anomaly(True)
 # Configurations
 ######################################################################
 # Fill in your experiment names and the other required components
-experiment_name = 'TargetDiscriminator'
+experiment_name = 'BlenderOriginal'
 data_root = './data_set/data_set/'
 train_list = 'train.str'
 test_list = 'test.str'
 batch_size = 8
-nthreads = 1
+nthreads = 4
 max_epochs = 20
 displayIter = 20
 saveIter = 1
@@ -163,10 +163,56 @@ def blend_imgs(source_tensor, target_tensor, mask_tensor):
         target_img = img_utils.tensor2bgr(target_tensor[b])
         mask = mask_tensor[b].permute(1, 2, 0).cpu().numpy()
         mask = np.round(mask * 255).astype('uint8')
+        # Poisson blending
         out_bgr = blend_imgs_bgr(source_img, target_img, mask)
         out_tensors.append(img_utils.bgr2tensor(out_bgr))
 
     return torch.cat(out_tensors, dim=0)
+
+
+def alpha_blending(source_tensor, target_tensor, alpha=0.5):
+    # Implements alpha blending
+    out_tensors = []
+    beta = 1.0 - alpha
+    for b in range(source_tensor.shape[0]):
+        source_img = img_utils.tensor2bgr(source_tensor[b])
+        target_img = img_utils.tensor2bgr(target_tensor[b])
+        out_rgb = cv2.addWeighted(source_img, alpha, target_img, beta, 0)
+        out_tensors.append(img_utils.bgr2tensor(out_rgb))
+
+    return torch.cat(out_tensors, dim=0)
+
+
+def laplacian_blending(source_tensor, target_tensor):
+    # Implements alpha blending
+    out_tensors = []
+    beta = 1.0 - alpha
+    for b in range(source_tensor.shape[0]):
+        source_img = img_utils.tensor2bgr(source_tensor[b])
+        target_img = img_utils.tensor2bgr(target_tensor[b])
+        out_rgb = cv2.addWeighted(source_img, alpha, target_img, beta, 0)
+        out_tensors.append(img_utils.bgr2tensor(out_rgb))
+
+    return torch.cat(out_tensors, dim=0)
+
+
+def visulize_images(source, swap, target, overlaid_image, img_blend, img_blend_alpha):
+    f, axarr = plt.subplots(1,6)
+    axarr[0].set_title("source")
+    axarr[0].imshow(img_utils.tensor2rgb(source[0]))
+    axarr[1].set_title("swap")
+    axarr[1].imshow(img_utils.tensor2rgb(swap[0]))
+    axarr[2].set_title("target")
+    axarr[2].imshow(img_utils.tensor2rgb(target[0]))
+    # axarr[3].set_title("mask")
+    # axarr[3].imshow(mask[0].permute(1,2,0).squeeze(), cmap='gray')
+    axarr[3].set_title("overlaid")
+    axarr[3].imshow(img_utils.tensor2rgb(overlaid_image[0]))
+    axarr[4].set_title("Poisson (GT)")
+    axarr[4].imshow(img_utils.tensor2rgb(img_blend[0]))
+    axarr[5].set_title("Alpha (GT)")
+    axarr[5].imshow(img_utils.tensor2rgb(img_blend_alpha[0]))
+    plt.show()
 
 
 def Train(G, D, epoch_count, iter_count):
@@ -192,7 +238,7 @@ def Train(G, D, epoch_count, iter_count):
         # Prepare input
         with torch.no_grad():
             # For each image, push to device
-            source = images['source'].to(device)
+            source = images['source'].to(device) #(fg)
             target = images['target'].to(device) #(bg)
             swap = images['swap'].to(device)     #(sw)
             mask = images['mask'].to(device)     #(mask)   
@@ -201,25 +247,13 @@ def Train(G, D, epoch_count, iter_count):
         overlaid_image = transfer_mask(swap, target, mask)
         # Ground Truth
         img_blend = blend_imgs(overlaid_image, target, mask).to(device)
+        # Ground Truth Alpha Blending
+        img_blend_alpha = alpha_blending(overlaid_image, target).to(device)
         # Concatenate overlaid_image, target and mask to derive the final input
         input = torch.cat((overlaid_image, target, mask), dim=1).to(device)
 
-        # print(overlaid_image[0].permute(1,2,0).squeeze().shape)
-        # f, axarr = plt.subplots(1,6)
-        # axarr[0].set_title("source")
-        # axarr[0].imshow(source[0].permute(1,2,0))
-        # axarr[1].set_title("swap")
-        # axarr[1].imshow(swap[0].permute(1,2,0))
-        # axarr[2].set_title("target")
-        # axarr[2].imshow(target[0].permute(1,2,0))
-        # axarr[3].set_title("mask")
-        # axarr[3].imshow(mask[0].permute(1,2,0).squeeze(), cmap='gray')
-        # axarr[4].set_title("overlaid")
-        # axarr[4].imshow(overlaid_image[0].permute(1,2,0).squeeze())
-        # axarr[5].set_title("blended (GT)")
-        # axarr[5].imshow(img_blend[0].permute(1,2,0).squeeze())
-        # plt.show()
-        # break
+        visulize_images(source, swap, target, overlaid_image, img_blend, img_blend_alpha)
+        return None
 
         # Blend images (pred)
         img_blend_pred = G(input)
@@ -234,7 +268,7 @@ def Train(G, D, epoch_count, iter_count):
 
         loss_D_total = (loss_D_fake + loss_D_real) * 0.5
 
-        # GAN loss (Fake Passability Loss)
+        # GAN loss
         pred_fake = D(img_blend_pred)
         loss_G_GAN = criterion_gan(pred_fake, True)
 
@@ -257,8 +291,8 @@ def Train(G, D, epoch_count, iter_count):
 
         if iter_count % displayIter == 0:
             # Write to the log file.
-            wandb.log((dict(pixelwise=loss_pixelwise.item(), id=loss_id.item(), attr=loss_attr.item(), rec=loss_rec.item(), g_gan=loss_G_GAN.item(), d_gan=loss_D_total.item())))
-            trainLogger.write(str(dict(pixelwise=loss_pixelwise.item(), id=loss_id.item(), attr=loss_attr.item(), rec=loss_rec.item(), g_gan=loss_G_GAN.item(), d_gan=loss_D_total.item())))
+            wandb.log((dict(pixelwise=loss_pixelwise.item(), id=loss_id.item(), attr=loss_attr.item(), rec=loss_rec.item(), g_gan=loss_G_GAN.item(), d_gan_total=loss_D_total.item(), g_gan_total=loss_G_total.item())))
+            # trainLogger.write(str(dict(pixelwise=loss_pixelwise.item(), id=loss_id.item(), attr=loss_attr.item(), rec=loss_rec.item(), g_gan=loss_G_GAN.item(), d_gan=loss_D_total.item())))
 
         # wandb.watch(D)
         # wandb.watch(G)
@@ -295,7 +329,7 @@ def Test(G):
         t = enumerate(testLoader)
         i, (images) = next(t)
 
-        source = images['source'].to(device)
+        source = images['source'].to(device) #(fg)
         target = images['target'].to(device) #(bg)
         swap = images['swap'].to(device)     #(sw)
         mask = images['mask'].to(device)     #(mask)   
