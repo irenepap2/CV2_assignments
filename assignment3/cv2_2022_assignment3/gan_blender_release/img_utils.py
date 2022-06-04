@@ -75,6 +75,14 @@ def tensor2rgb(img_tensor):
     return output_img
 
 
+def tensor2rgb_without_rounding(img_tensor):
+
+    output_img = unnormalize(img_tensor.clone(), [0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
+    output_img = output_img.squeeze().permute(1, 2, 0).cpu().numpy()
+
+    return output_img
+
+
 def tensor2bgr(img_tensor):
     """ Convert an image tensor to a numpy BGR image.
 

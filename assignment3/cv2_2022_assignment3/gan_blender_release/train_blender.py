@@ -21,12 +21,14 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import wandb
 
-# wandb.init(project="FSGAN-CV2-project", entity="irenepap")
+from blending import *
+
+wandb.init(project="FSGAN-CV2-project", entity="irenepap")
 torch.autograd.set_detect_anomaly(True)
 # Configurations
 ######################################################################
 # Fill in your experiment names and the other required components
-experiment_name = 'BlenderOriginal'
+experiment_name = 'BlenderLaplacian'
 data_root = './data_set/data_set/'
 train_list = 'train.str'
 test_list = 'test.str'
@@ -141,81 +143,29 @@ def transfer_mask(img1, img2, mask):
     return img1 * mask + img2 * (1 - mask)
 
 
-def blend_imgs_bgr(source_img, target_img, mask):
-    # Implement poisson blending here. You can us the built-in seamlessclone
-    # function in opencv which is an implementation of Poisson Blending.
-    a = np.where(mask != 0)
-    if len(a[0]) == 0 or len(a[1]) == 0:
-        return target_img
-    if (np.max(a[0]) - np.min(a[0])) <= 10 or (np.max(a[1]) - np.min(a[1])) <= 10:
-        return target_img
-
-    center = (np.min(a[1]) + np.max(a[1])) // 2, (np.min(a[0]) + np.max(a[0])) // 2
-    output = cv2.seamlessClone(source_img, target_img, mask, center, cv2.NORMAL_CLONE)
-
-    return output
-
-
-def blend_imgs(source_tensor, target_tensor, mask_tensor):
-    out_tensors = []
-    for b in range(source_tensor.shape[0]):
-        source_img = img_utils.tensor2bgr(source_tensor[b])
-        target_img = img_utils.tensor2bgr(target_tensor[b])
-        mask = mask_tensor[b].permute(1, 2, 0).cpu().numpy()
-        mask = np.round(mask * 255).astype('uint8')
-        # Poisson blending
-        out_bgr = blend_imgs_bgr(source_img, target_img, mask)
-        out_tensors.append(img_utils.bgr2tensor(out_bgr))
-
-    return torch.cat(out_tensors, dim=0)
-
-
-def alpha_blending(source_tensor, target_tensor, alpha=0.5):
-    # Implements alpha blending
-    out_tensors = []
-    beta = 1.0 - alpha
-    for b in range(source_tensor.shape[0]):
-        source_img = img_utils.tensor2bgr(source_tensor[b])
-        target_img = img_utils.tensor2bgr(target_tensor[b])
-        out_rgb = cv2.addWeighted(source_img, alpha, target_img, beta, 0)
-        out_tensors.append(img_utils.bgr2tensor(out_rgb))
-
-    return torch.cat(out_tensors, dim=0)
-
-
-def laplacian_blending(source_tensor, target_tensor):
-    # Implements alpha blending
-    out_tensors = []
-    beta = 1.0 - alpha
-    for b in range(source_tensor.shape[0]):
-        source_img = img_utils.tensor2bgr(source_tensor[b])
-        target_img = img_utils.tensor2bgr(target_tensor[b])
-        out_rgb = cv2.addWeighted(source_img, alpha, target_img, beta, 0)
-        out_tensors.append(img_utils.bgr2tensor(out_rgb))
-
-    return torch.cat(out_tensors, dim=0)
-
-
-def visulize_images(source, swap, target, overlaid_image, img_blend, img_blend_alpha):
-    f, axarr = plt.subplots(1,6)
-    axarr[0].set_title("source")
-    axarr[0].imshow(img_utils.tensor2rgb(source[0]))
-    axarr[1].set_title("swap")
-    axarr[1].imshow(img_utils.tensor2rgb(swap[0]))
-    axarr[2].set_title("target")
-    axarr[2].imshow(img_utils.tensor2rgb(target[0]))
-    # axarr[3].set_title("mask")
+def visulize_images(source, swap, target, mask, overlaid_image, img_blend, img_blend_alpha, img_blend_lapl):
+    f, axarr = plt.subplots(1,4)
+    # axarr[0].set_title("Source")
+    # axarr[0].imshow(img_utils.tensor2rgb(source[0]))
+    # axarr[1].set_title("Swap")
+    # axarr[1].imshow(img_utils.tensor2rgb(swap[0]))
+    # axarr[2].set_title("Target")
+    # axarr[2].imshow(img_utils.tensor2rgb(target[0]))
+    # axarr[3].set_title("Mask")
     # axarr[3].imshow(mask[0].permute(1,2,0).squeeze(), cmap='gray')
-    axarr[3].set_title("overlaid")
-    axarr[3].imshow(img_utils.tensor2rgb(overlaid_image[0]))
-    axarr[4].set_title("Poisson (GT)")
-    axarr[4].imshow(img_utils.tensor2rgb(img_blend[0]))
-    axarr[5].set_title("Alpha (GT)")
-    axarr[5].imshow(img_utils.tensor2rgb(img_blend_alpha[0]))
+    axarr[0].set_title("Overlaid")
+    axarr[0].imshow(img_utils.tensor2rgb(overlaid_image[0]))
+    axarr[1].set_title("Poisson Blending")
+    axarr[1].imshow(img_utils.tensor2rgb(img_blend[0]))
+    axarr[2].set_title("Alpha Blending")
+    axarr[2].imshow(img_utils.tensor2rgb(img_blend_alpha[0]))
+    axarr[3].set_title("Laplacian Pyramid Blending")
+    # axarr[3].imshow(img_utils.tensor2rgb(img_blend_lapl[0]))
+    axarr[3].imshow(img_blend_lapl[0].permute(1,2,0))
     plt.show()
 
 
-def Train(G, D, epoch_count, iter_count):
+def Train(G, D, epoch_count, iter_count, blend='poisson'):
     G.train(True)
     D.train(True)
     epoch_count += 1
@@ -246,14 +196,16 @@ def Train(G, D, epoch_count, iter_count):
         # Overlaid image
         overlaid_image = transfer_mask(swap, target, mask)
         # Ground Truth
-        img_blend = blend_imgs(overlaid_image, target, mask).to(device)
+        # img_blend = blend_imgs(overlaid_image, target, mask).to(device)
         # Ground Truth Alpha Blending
-        img_blend_alpha = alpha_blending(overlaid_image, target).to(device)
+        # img_blend_alpha = alpha_blending(overlaid_image, target).to(device)
+        # Ground Truth Laplacian Blending
+        img_blend = laplacian_blending(target, overlaid_image, mask, num_levels=7).to(device)
         # Concatenate overlaid_image, target and mask to derive the final input
         input = torch.cat((overlaid_image, target, mask), dim=1).to(device)
 
-        visulize_images(source, swap, target, overlaid_image, img_blend, img_blend_alpha)
-        return None
+        # visulize_images(source, swap, target, mask, overlaid_image, img_blend, img_blend_alpha, img_blend_lapl)
+        # return None
 
         # Blend images (pred)
         img_blend_pred = G(input)
@@ -292,12 +244,10 @@ def Train(G, D, epoch_count, iter_count):
         if iter_count % displayIter == 0:
             # Write to the log file.
             wandb.log((dict(pixelwise=loss_pixelwise.item(), id=loss_id.item(), attr=loss_attr.item(), rec=loss_rec.item(), g_gan=loss_G_GAN.item(), d_gan_total=loss_D_total.item(), g_gan_total=loss_G_total.item())))
-            # trainLogger.write(str(dict(pixelwise=loss_pixelwise.item(), id=loss_id.item(), attr=loss_attr.item(), rec=loss_rec.item(), g_gan=loss_G_GAN.item(), d_gan=loss_D_total.item())))
+            trainLogger.write(str(dict(pixelwise=loss_pixelwise.item(), id=loss_id.item(), attr=loss_attr.item(), rec=loss_rec.item(), g_gan=loss_G_total.item(), d_gan=loss_D_total.item())))
 
-        # wandb.watch(D)
-        # wandb.watch(G)
         # Print out the losses here. Tqdm uses that to automatically print it in front of the progress bar.
-        pbar.set_description(str(dict(pixelwise=loss_pixelwise.item(), id=loss_id.item(), attr=loss_attr.item(), rec=loss_rec.item(), g_gan=loss_G_GAN.item(), d_gan=loss_D_total.item())))
+        pbar.set_description(str(dict(pixelwise=loss_pixelwise.item(), id=loss_id.item(), attr=loss_attr.item(), rec=loss_rec.item(), g_gan=loss_G_total.item(), d_gan=loss_D_total.item())))
 
     # Save output of the network at the end of each epoch.
     t_source, t_swap, t_target, t_pred, t_blend = Test(G)
@@ -319,8 +269,86 @@ def Train(G, D, epoch_count, iter_count):
 
     return np.nanmean(loss_pixelwise.cpu().detach().numpy()),\
         np.nanmean(loss_id.cpu().detach().numpy()), np.nanmean(loss_attr.cpu().detach().numpy()),\
-        np.nanmean(loss_rec.cpu().detach().numpy()), np.nanmean(loss_G_GAN.cpu().detach().numpy()),\
+        np.nanmean(loss_rec.cpu().detach().numpy()), np.nanmean(loss_G_total.cpu().detach().numpy()),\
         np.nanmean(loss_D_total.cpu().detach().numpy()), iter_count
+
+
+def Train_without_D(G, epoch_count, iter_count):
+    G.train(True)
+    epoch_count += 1
+    pbar = tqdm(enumerate(trainLoader), total=len(trainLoader), leave=False)
+
+    Epoch_time = time.time()
+
+    for i, data in pbar:
+        iter_count += 1
+        images = data
+
+        # Implement your training loop here. images will be the datastructure
+        # being returned from your dataloader.
+        # 1) Load and transfer data to device
+        # 2) Feed the data to the networks. 
+        # 4) Calculate the losses.
+        # 5) Perform backward calculation.
+        # 6) Perform the optimizer step.
+
+        # Prepare input
+        with torch.no_grad():
+            # For each image, push to device
+            source = images['source'].to(device) #(fg)
+            target = images['target'].to(device) #(bg)
+            swap = images['swap'].to(device)     #(sw)
+            mask = images['mask'].to(device)     #(mask)   
+
+        # Overlaid image
+        overlaid_image = transfer_mask(swap, target, mask)
+        # Ground Truth
+        img_blend = blend_imgs(overlaid_image, target, mask).to(device)
+        # Concatenate overlaid_image, target and mask to derive the final input
+        input = torch.cat((overlaid_image, target, mask), dim=1).to(device)
+
+        # Blend images (pred)
+        img_blend_pred = G(input)
+
+        # Reconstruction
+        loss_pixelwise = criterion_pixelwise(img_blend_pred, img_blend)
+        loss_id = criterion_id(img_blend_pred, img_blend)
+        loss_attr = criterion_attr(img_blend_pred, img_blend)
+        loss_rec = pix_weight * loss_pixelwise + 0.5 * loss_id + 0.5 * loss_attr
+
+        loss_G_total = rec_weight * loss_rec
+
+        optimizer_G.zero_grad()
+        loss_G_total.backward()
+        optimizer_G.step()
+
+        if iter_count % displayIter == 0:
+            # Write to the log file.
+            trainLogger.write(str(dict(pixelwise=loss_pixelwise.item(), id=loss_id.item(), attr=loss_attr.item(), rec=loss_rec.item(), g_gan=loss_G_total.item())))
+            # wandb.log((dict(pixelwise=loss_pixelwise.item(), id=loss_id.item(), attr=loss_attr.item(), rec=loss_rec.item(), g_gan_total=loss_G_total.item())))
+
+        # Print out the losses here. Tqdm uses that to automatically print it in front of the progress bar.
+        # pbar.set_description(str(dict(g_gan_total=loss_G_total.item())))
+
+    # Save output of the network at the end of each epoch.
+    t_source, t_swap, t_target, t_pred, t_blend = Test(G)
+    for b in range(t_pred.shape[0]):
+        total_grid_load = [t_source[b], t_swap[b], t_target[b],
+                           t_pred[b], t_blend[b]]
+        grid = img_utils.make_grid(total_grid_load,
+                                   cols=len(total_grid_load))
+        grid = img_utils.tensor2rgb(grid.detach())
+        imageio.imwrite(visuals_loc + '/Epoch_%d_output_%d.png' %
+                        (epoch_count, b), grid)
+        wandb.log(dict(images=wandb.Image(grid)))
+
+    utils.saveModels(G, optimizer_G, iter_count,
+                     checkpoint_pattern % ('G', epoch_count))
+    tqdm.write('[!] Model Saved!')
+
+    return np.nanmean(loss_pixelwise.cpu().detach().numpy()),\
+        np.nanmean(loss_id.cpu().detach().numpy()), np.nanmean(loss_attr.cpu().detach().numpy()),\
+        np.nanmean(loss_rec.cpu().detach().numpy()), np.nanmean(loss_G_total.cpu().detach().numpy()), iter_count
 
 
 def Test(G):
@@ -343,6 +371,7 @@ def Test(G):
 
         # Blend images
         pred = G(img_transfer_input)
+
         # You want to return 5 components:
         #     1) The source face. (fg)
         #     2) The 3D reconsturction.
@@ -367,10 +396,15 @@ print('\tExperiment Name: ', experiment_name)
 for i in range(max_epochs):
     # Call the Train function here
     # Step through the schedulers if using them.
-    # You can also print out the losses of the network here to keep track of
-    # epoch wise loss.
-    loss_pixelwise, loss_id, loss_attr, loss_rec, loss_G_GAN, loss_D_total, iter_count= Train(generator, discriminator, i, iter_count)
+    # You can also print out the losses of the network here to keep track of epoch wise loss.
+    
+    # Train GAN
+    loss_pixelwise, loss_id, loss_attr, loss_rec, loss_G_total, loss_D_total, iter_count= Train(generator, discriminator, i, iter_count)
+    # wandb.log((dict(pixelwise=loss_pixelwise.item(), id=loss_id.item(), attr=loss_attr.item(), rec=loss_rec.item(), d_gan_total=loss_D_total.item(), g_gan_total=loss_G_total.item())))
     # print(str(dict(pixelwise=loss_pixelwise.item(), id=loss_id.item(), attr=loss_attr.item(), rec=loss_rec.item(), g_gan=loss_G_GAN.item(), d_gan=loss_D_total.item())))
-
+    
+    # Train without discriminator
+    # loss_pixelwise, loss_id, loss_attr, loss_rec, loss_G_total, iter_count= Train_without_D(generator, i, iter_count)
+    # wandb.log((dict(pixelwise=loss_pixelwise.item(), id=loss_id.item(), attr=loss_attr.item(), rec=loss_rec.item(), g_gan_total=loss_G_total.item())))
 
 trainLogger.close()
