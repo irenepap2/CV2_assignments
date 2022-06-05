@@ -23,7 +23,7 @@ import wandb
 
 from blending import *
 
-wandb.init(project="FSGAN-CV2-project", entity="irenepap")
+# wandb.init(project="FSGAN-CV2-project", entity="irenepap")
 torch.autograd.set_detect_anomaly(True)
 # Configurations
 ######################################################################
@@ -196,11 +196,11 @@ def Train(G, D, epoch_count, iter_count, blend='poisson'):
         # Overlaid image
         overlaid_image = transfer_mask(swap, target, mask)
         # Ground Truth
-        # img_blend = blend_imgs(overlaid_image, target, mask).to(device)
+        img_blend = blend_imgs(overlaid_image, target, mask).to(device)
         # Ground Truth Alpha Blending
-        # img_blend_alpha = alpha_blending(overlaid_image, target).to(device)
+        img_blend_alpha = alpha_blending(overlaid_image, target).to(device)
         # Ground Truth Laplacian Blending
-        img_blend = laplacian_blending(target, overlaid_image, mask, num_levels=7).to(device)
+        img_blend_lapl = laplacian_blending(target, overlaid_image, mask, num_levels=7).to(device)
         # Concatenate overlaid_image, target and mask to derive the final input
         input = torch.cat((overlaid_image, target, mask), dim=1).to(device)
 

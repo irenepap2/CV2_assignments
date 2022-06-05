@@ -117,6 +117,8 @@ def laplacian_blending(source_tensor, target_tensor, mask_tensor, num_levels = 2
     for b in range(source_tensor.shape[0]):
         source_img = img_utils.tensor2rgb_without_rounding(source_tensor[b])
         target_img = img_utils.tensor2rgb_without_rounding(target_tensor[b])
+        # source_img = img_utils.tensor2rgb(source_tensor[b])
+        # target_img = img_utils.tensor2rgb(target_tensor[b])
 
         # Turn to float32
         source_img = np.float32(source_img)
@@ -141,10 +143,9 @@ def laplacian_blending(source_tensor, target_tensor, mask_tensor, num_levels = 2
         # Blend the images
         add_laplace = blend(laplacian_pyr_1, laplacian_pyr_2, mask_pyr_final)
         # Reconstruct the images
-        # out_rgb = reconstruct(add_laplace)
         out_rgb = reconstruct(add_laplace)
 
-        out_tensors.append(img_utils.rgb2tensor(out_rgb[num_levels]))
-        # out_tensors.append(torch.from_numpy(out_rgb[num_levels]).permute(2, 0, 1).unsqueeze(0))
+        # out_tensors.append(img_utils.rgb2tensor(out_rgb[num_levels]))
+        out_tensors.append(torch.from_numpy(out_rgb[num_levels]).permute(2, 0, 1).unsqueeze(0))
 
     return torch.cat(out_tensors, dim=0)
