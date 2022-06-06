@@ -5,6 +5,7 @@ PATH = './'
 
 bfm = h5py.File(PATH + 'model2017-1_face12_nomouth.h5', 'r')
 img1 = cv2.imread(PATH + 'beyonce.jpg')[:,:,::-1]
+h, w = img1.shape[:2]
 
 # 4.2.1 Morphable model
 G, color, shape_rep = find_g(bfm)
@@ -13,7 +14,7 @@ G, color, shape_rep = find_g(bfm)
 # 4.2.2 Pinhole camera model
 rots = torch.FloatTensor([0, 0, 180])
 t = torch.FloatTensor([0, 0, -500])
-G_2D = pinhole(G, rots, t, img1.shape[0], img1.shape[1])
+G_2D = pinhole(G, rots, t, h, w)
 
 
 # 4.2.3 Latent parameter estimation
