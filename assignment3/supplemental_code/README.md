@@ -1,6 +1,7 @@
 # cv2_assignment3
 //////////// FILES INCLUDED ///////////////////////
 
+- main.py                    : Contains code to run all of 4.2
 - energy_optimization.py     : Find hyperparameters of face
 - face_swapping.py           : Run the face swapping algorithm and attached functions.
 - supplemental_code.py       : Contains utility functions
@@ -30,7 +31,7 @@ texturize() is used to find the RGB values of the newly found image mesh.
 
 //////////// DATA/data FILES INCLUDED ///////////////////////
 
-- ##########.jpeg file       : RGB images.
+- ##########.jpeg file       : RGB images
 - ##########.png file        : RGB images
 - ##########.anl file        : Landmark file
 - ##########.obj file        : Object mesh file
