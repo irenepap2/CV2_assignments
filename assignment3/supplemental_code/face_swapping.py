@@ -12,6 +12,11 @@ import imutils
 
 
 def find_g(bfm, alpha=None, delta=None, save_G=False, name="morphable2.obj"):
+    '''
+    Obtain point cloud, triangles and colors of BFM.
+    '''
+
+    # PCA for shape
     shape_mean = np.asarray(bfm['shape/model/mean'], dtype=np.float32)
     shape_mean = np.reshape(shape_mean, (-1, 3))
 
@@ -21,6 +26,7 @@ def find_g(bfm, alpha=None, delta=None, save_G=False, name="morphable2.obj"):
     shape_var = np.asarray(bfm['shape/model/pcaVariance'], dtype=np.float32)[:30]
     shape_var = np.sqrt(shape_var)
 
+    # PCA for expression
     exp_mean = np.asarray(bfm['expression/model/mean'], dtype=np.float32)
     exp_mean = np.reshape(exp_mean, (-1, 3))
 
@@ -55,6 +61,9 @@ def find_g(bfm, alpha=None, delta=None, save_G=False, name="morphable2.obj"):
 
 
 def get_landmarks(G_3D, plot=False):
+    '''
+    Obtain and possibly plot the landmark points of 3D point cloud.
+    '''
     with open("Landmarks68_model2017-1_face12_nomouth.anl", 'r') as f:
         idxs = f.read().split('\n')
         idxs = [int(x) for x in idxs]
@@ -67,8 +76,13 @@ def get_landmarks(G_3D, plot=False):
         return landmarks
 
 
-def pinhole(G, Rots, t, h, w, fov=0.5):
+def pinhole(G, Rots, t, h, w, fov=0.5, save_model=False, name="rotation.obj", shape_rep=None):
+    '''
+    Calcualte and apply the pinhole camera of a point cloud with rotation and
+    translation.
+    '''
 
+    # Create rotation matrix
     Rx, Ry, Rz = Rots
     Rx, Ry, Rz = math.radians(Rx), math.radians(Ry), math.radians(Rz)
     Rotx = np.array([[1, 0, 0],
@@ -87,12 +101,14 @@ def pinhole(G, Rots, t, h, w, fov=0.5):
     color = np.asarray(bfm['color/model/mean'], dtype=np.float32)
     color = np.reshape(color, (color.shape[0] // 3, 3))
 
+    # Roto translate the model
     G = G @ R.T + t
 
-    # shape_rep = np.asarray(bfm['shape/representer/cells'], dtype=np.int32).T
-    # save_obj("morphable_rot.obj", G_R, color, shape_rep)
+    # Save model if wanted
+    if save_model:
+        save_obj(name, G, color, shape_rep)
 
-    #convert to homogeneous coordinates
+    # Convert to homogeneous coordinates
     G_ = torch.cat((G, torch.ones(G.shape[0],1)), dim=1)
 
     # Find ranges
@@ -104,16 +120,18 @@ def pinhole(G, Rots, t, h, w, fov=0.5):
     vr = vt * aspect_ratio
     vl = -vt * aspect_ratio
 
+    # Create viewport matrix
     V = np.array([[(vr-vl)/2, 0, 0, (vr+vl)/2],
                   [0, (vt-vb)/2, 0, (vt+vb)/2],
                   [0, 0, 1/2, 1/2],
                   [0, 0, 0, 1]])
-
+    # Create perspective projection matrix
     P = np.array([[2*vn/(vr-vl), 0, (vr+vl)/(vr-vl), 0],
                  [0, 2*vn/(vt-vb), (vt+vb)/(vt-vb), 0],
                  [0, 0, -(vf+vn)/(vf-vn), -2*vf*vn/(vf-vn)],
                  [0, 0, -1, 0]])
 
+    # Create the pinhole camera and apply.
     Pi = torch.from_numpy(V @ P).float()
 
     G_3D = (G_ @ Pi.T)
@@ -125,10 +143,16 @@ def pinhole(G, Rots, t, h, w, fov=0.5):
 
 
 def texturing(img, model, bfm, h, w, interp=True):
+    '''
+    Find color belonging to mesh found by the model.
+    '''
+
+    # Obtain landmarks
     gt_landmarks = detect_landmark(img)
     gt_landmarks[:, 0] = gt_landmarks[:, 0]
     gt_landmarks[:, 1] = gt_landmarks[:, 1]
 
+    # Predict model face mesh and 2D representation.
     G_3D, G_2D, pred_landmarks, shape_rep = model(bfm, h, w)
     G_2D = G_2D[:, :2]
 
@@ -141,7 +165,10 @@ def texturing(img, model, bfm, h, w, interp=True):
 
     img_rot = imutils.rotate(img, 90)
     colors = []
+
+    # Find colors associated with each pixel in the mesh.
     for x, y in G_2D:
+        # Test with or without interpolation.
         if interp:
             c = interpolate(x.item(), y.item(), img_rot)
         else:
@@ -150,6 +177,7 @@ def texturing(img, model, bfm, h, w, interp=True):
 
         colors.append(c)
 
+    # Render the image.
     colors = np.array(colors)
     textured = render(G_3D.detach().numpy(), colors / 255, shape_rep, H=h, W=w)
 
@@ -182,6 +210,9 @@ def interpolate(x, y, img):
 
 
 def multiple_frames(imgs, bfm):
+    '''
+    Train the model with multiple images.
+    '''
     for i, img in enumerate(imgs):
         h, w = img.shape[:2]
         gt_landmarks = detect_landmark(img)
@@ -198,6 +229,9 @@ def multiple_frames(imgs, bfm):
 
 
 def faceswap(img1, img2, bfm):
+    '''
+    Places the texture of img 1 onto img2 with the face parameters.
+    '''
     h1, w1 = img1.shape[:2]
     h2, w2 = img2.shape[:2]
 
@@ -233,6 +267,9 @@ def faceswap(img1, img2, bfm):
 
 
 if __name__ == '__main__':
+    '''
+    Uncomment any specific settings you would like to test.
+    '''
     bfm = h5py.File('model2017-1_face12_nomouth.h5', 'r')
 
     # rots = torch.FloatTensor([0, 0, 180])
