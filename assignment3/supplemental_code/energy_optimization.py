@@ -8,18 +8,18 @@ class EnergyOptim(nn.Module):
     def __init__(self):
 
         super(EnergyOptim, self).__init__()
-       
+
         self.alpha = nn.Parameter(torch.FloatTensor(30).uniform_(-1, 1), requires_grad=True)
         self.delta = nn.Parameter(torch.FloatTensor(20).uniform_(-1, 1), requires_grad=True)
         self.Rots = nn.Parameter(torch.FloatTensor([0, 0, 180]), requires_grad=True)
         self.t = nn.Parameter(torch.FloatTensor([0, 0, -500]), requires_grad=True)
-    
+
     def forward(self, bfm, h, w):
-        face_3D, _, _ = find_g(bfm, self.alpha, self.delta)
+        face_3D, _, shape_rep = find_g(bfm, self.alpha, self.delta)
         face_2D = pinhole(face_3D, self.Rots, self.t, h, w)
         pred = get_landmarks(face_2D)
 
-        return(pred)
+        return (face_3D, face_2D, pred, shape_rep)
 
 
 def loss_c(landmarks, pred, alpha, delta, l_alpha=0, l_delta=0):
@@ -28,7 +28,7 @@ def loss_c(landmarks, pred, alpha, delta, l_alpha=0, l_delta=0):
     return (Llan + Lreg)
 
 
-def train_model(model, bfm, gt, h, w, iters=2000):
+def train_model(model, bfm, gt, h, w, iters=10000):
     optimizer = torch.optim.Adam(model.parameters(), lr=0.05)
     # optimizer = torch.optim.Adam([{'params': model.Rots,  'lr': 1},
     #                               {'params': model.t,     'lr': 1},
@@ -36,32 +36,49 @@ def train_model(model, bfm, gt, h, w, iters=2000):
     #                               {'params': model.delta, 'lr': 0.1}])
 
     losses = []
-    for _ in range(iters):
-        pred = model(bfm, h, w)
+    for i in range(iters):
+        _, _, pred, _ = model(bfm, h, w)
         loss = loss_c(gt, pred, model.alpha, model.delta)
-        print('loss:', loss)
-        
         losses.append(loss.item())
-        
+
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-    plt.plot(losses)
-    plt.xlabel('iteration')
-    plt.ylabel('loss')
-    plt.show()
+        if i % 1000 == 0:
+            print(f"Finished iter {i}")
+            print('loss:', loss)
+
+    # plt.plot(losses)
+    # plt.xlabel('iteration')
+    # plt.ylabel('loss')
+    # plt.show()
 
     return(model, losses)
 
-#Load bfm
-bfm = h5py.File('model2017-1_face12_nomouth.h5', 'r')
-#Get gt landmarks
-img = cv2.imread('beyonce.jpg')[:,:,::-1]
-h, w, _ = img.shape
-gt_landmarks = detect_landmark(img)
-gt_landmarks[:,0] = gt_landmarks[:,0] - w/2
-gt_landmarks[:,1] = gt_landmarks[:,1] - h/2
 
-model = EnergyOptim()
-model, losses = train_model(model, bfm, torch.from_numpy(gt_landmarks), h, w)
+if __name__ == '__main__':
+    # Load bfm
+    bfm = h5py.File('model2017-1_face12_nomouth.h5', 'r')
+
+    img = cv2.imread('beyonce.jpg')[:, :, ::-1]  # Convert from BGR to RGB
+    h, w, _ = img.shape
+
+    # Get gt landmarks
+    gt_landmarks = detect_landmark(img)
+    gt_landmarks[:,0] = gt_landmarks[:,0] - w/2
+    gt_landmarks[:,1] = gt_landmarks[:,1] - h/2
+
+    model = EnergyOptim()
+    model, losses = train_model(model, bfm, torch.from_numpy(gt_landmarks), h, w)
+    print(model.alpha, "\n")
+    print(model.delta, "\n")
+    print(model.Rots, "\n")
+    print(model.t, "\n")
+
+    _, _, pred_landmarks = model(bfm, h, w).detach().numpy()
+    print(pred_landmarks.shape)
+    plt.scatter(pred_landmarks[:,0], pred_landmarks[:,1], color='red', label='prediction')
+    plt.scatter(gt_landmarks[:,0], gt_landmarks[:,1], color='blue', label='ground truth')
+    plt.legend()
+    plt.show()

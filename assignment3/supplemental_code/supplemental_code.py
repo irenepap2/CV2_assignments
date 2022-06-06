@@ -8,20 +8,20 @@ import numpy as np
 def shape_to_np(shape, dtype="int"):
     # initialize the list of (x, y)-coordinates
     coords = np.zeros((68, 2), dtype=dtype)
- 
+
     # loop over the 68 facial landmarks and convert them
     # to a 2-tuple of (x, y)-coordinates
     for i in range(0, 68):
         coords[i] = (shape.part(i).x, shape.part(i).y)
- 
+
     # return the list of (x, y)-coordinates
     return coords
 
 def detect_landmark(img):
     detector = dlib.get_frontal_face_detector()
     predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
-    # win = dlib.image_window()
-    # win.set_image(img)
+    win = dlib.image_window()
+    win.set_image(img)
 
     # Ask the detector to find the bounding boxes of each face. The 1 in the
     # second argument indicates that we should upsample the image 1 time. This
@@ -50,7 +50,7 @@ def save_obj(file_path, shape, color, triangles):
 
     with open(file_path, 'wb') as f:
         data = np.hstack((shape, color))
-        
+
         np.savetxt(
             f, data,
             fmt=' '.join(['v'] + ['%.5f'] * data.shape[1]))
@@ -60,7 +60,7 @@ def save_obj(file_path, shape, color, triangles):
 
 def render(uvz, color, triangles, H=480, W=640):
     """ Renders an image of size WxH given u, v, z vertex coordinates, vertex color and triangle topology.
-    
+
     uvz - matrix of shape Nx3, where N is an amount of vertices
     color - matrix of shape Nx3, where N is an amount of vertices, 3 channels represent R,G,B color scaled from 0 to 1
     triangles - matrix of shape Mx3, where M is an amount of triangles, each column represents a vertex index
@@ -114,12 +114,12 @@ def render(uvz, color, triangles, H=480, W=640):
                 b2 = cross_product(v01, v0p) / tri_a
                 if (b1 < 0) or (b2 < 0) or (b1 + b2 > 1):
                     continue
-                
+
                 b0 = 1 - b1 - b2
                 p[2] = b0 * v0[2] + b1 * v1[2] + b2 * v2[2]
 
                 if p[2] > z_buffer[v, u]:
                     z_buffer[v, u] = p[2]
                     image[v, u] = b0 * color[id0] + b1 * color[id1] + b2 * color[id2]
-    
+
     return image
