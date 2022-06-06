@@ -24,6 +24,10 @@ as well.
 The pinhole() function takes a point cloud G with some rotation and transformation and projects this
 onto a 2D plane with some set width, height and fov. All these parameters can be set seperately.
 
+interpolate() calculates the bilinear interpolation for a point x, y to obtain its R, G or B value.
+
+texturize() is used to find the RGB values of the newly found image mesh.
+
 //////////// DATA/data FILES INCLUDED ///////////////////////
 
 - ##########.jpeg file       : RGB images.
