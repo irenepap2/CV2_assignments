@@ -1,24 +1,36 @@
 from face_swapping import *
 from energy_optimization import *
+from supplemental_code import detect_landmark
+'''
+General execution function. Run to obtain results in report.
+Uncomment plots to visually obtain results.
+'''
 
-PATH = './'
+PATH = ''
 
 bfm = h5py.File(PATH + 'model2017-1_face12_nomouth.h5', 'r')
 img1 = cv2.imread(PATH + 'beyonce.jpg')[:,:,::-1]
-h, w = img1.shape[:2]
+h, w, _ = img1.shape
 
 # 4.2.1 Morphable model
 G, color, shape_rep = find_g(bfm)
 
-
 # 4.2.2 Pinhole camera model
-rots = torch.FloatTensor([0, 0, 180])
+t = torch.FloatTensor([0, 0, 0])
+rots = torch.FloatTensor([0, -10, 0])
+G_2D = pinhole(G, rots, t, img1.shape[0], img1.shape[1], save_model=True, name='negrotation.obj', shape_rep=shape_rep)
+rots = torch.FloatTensor([0, 10, 0])
+G_2D = pinhole(G, rots, t, img1.shape[0], img1.shape[1], save_model=True, name='posrotation.obj', shape_rep=shape_rep)
 t = torch.FloatTensor([0, 0, -500])
-G_2D = pinhole(G, rots, t, h, w)
+G_2D = pinhole(G, rots, t, img1.shape[0], img1.shape[1])
+# get_landmarks(G_2D, plot=True)
+rots = torch.FloatTensor([0, 0, 180])
+G_2D = pinhole(G, rots, t, img1.shape[0], img1.shape[1])
 
 
 # 4.2.3 Latent parameter estimation
 gt_landmarks = detect_landmark(img1)
+print(gt_landmarks.shape)
 gt_landmarks[:, 0] = gt_landmarks[:, 0] - w/2
 gt_landmarks[:, 1] = gt_landmarks[:, 1] - h/2
 
